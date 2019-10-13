@@ -4,10 +4,11 @@
 import json
 import time
 from datetime import datetime as dt
-import pytz
 
 import grequests
 import json_lines as jl
+import pandas as pd
+import pytz
 
 
 def main(_max, batch_size):
@@ -23,6 +24,8 @@ def main(_max, batch_size):
                         {'id': article['id'], 'url': get_image_url(article)})  # temp list to make requests easier
 
                     article = convert_unix_to_datetime(article)
+                    article = add_image_url(article)
+                    article = remove_type_from_object(article)
 
                     articles.append(article)
 
@@ -51,6 +54,19 @@ def main(_max, batch_size):
     return articles
 
 
+# Removes "type" property from object
+def remove_type_from_object(item):
+    del item['type']
+    return item
+
+
+# Adds image url from content array to root level
+def add_image_url(item):
+    url = get_image_url(item)
+    item['image_url'] = url
+    return item
+
+
 # Convert unix dates to datetime string
 def convert_unix_to_datetime(item):
     item['published_date'] = dt.utcfromtimestamp(item['published_date'] / 1000.0)\
@@ -59,6 +75,7 @@ def convert_unix_to_datetime(item):
     return item
 
 
+# Removes objects that correspond to a failed image request
 def remove_failed_objects(failed, article_data):
     for item in article_data:
         url = get_image_url(item)
@@ -70,8 +87,9 @@ def remove_failed_objects(failed, article_data):
 
 # Writes the data to a json file
 # Modifies the file to be json serializable
-def write_to_file(articles):
-    with open('../HuJuData/data/snippetTest.json', 'w', encoding='utf-8') as file_handler:
+def get_as_json(articles):
+    articles = from_array_to_string(articles)
+    with open('../HuJuData/data/snippetTest2.json', 'w', encoding='utf-8') as file_handler:
         file_handler.write('[')
         for item in articles:
             file_handler.write(json.dumps(item, indent=2, ensure_ascii=False))
@@ -92,6 +110,31 @@ def get_image_url(current_article):
                     return str(content['imageURL'])
 
 
+# Writes data as csv
+def get_as_csv(d):
+    f = from_array_to_string(d)
+
+    df = pd.DataFrame(f)
+    df.to_csv('../HuJuData/data/snippetCSV2.csv', sep=',', index=False)
+
+
+# Extract all content objects (in a json array) of type paragraph to a single string
+def from_array_to_string(d):
+    content_string = ''
+
+    for x in d:
+        for k, v in x.items():
+            if k == 'contents':
+                for i in v:
+                    for e, h in i.items():
+                        if e == 'subtype' and h == 'paragraph':
+                            content_string += i['content']
+                x.pop(k)
+                x['text'] = content_string
+                content_string = ''
+    return d
+
+
 # Downloads images from a given list of urls
 # Filenames equate to article ID
 class ImageFetcher:
@@ -110,8 +153,8 @@ class ImageFetcher:
     def get(self):
         results = grequests.map((grequests.get(u) for u in self.urls),
                                 exception_handler=self.exception,
-                                size=500,
-                                stream=False)
+                                size=50,
+                                stream=True)
         for x in range(len(self.urls)):
             with open('../HuJuData/data/images/' + self.ids[x] + '.jpg', 'wb') as handler:
                 if results[x] is not None:
@@ -124,8 +167,7 @@ class ImageFetcher:
 if __name__ == '__main__':
     start = time.time()
 
-    data = main(_max=1000, batch_size=500)
-    write_to_file(data)
+    get_as_csv(main(_max=250, batch_size=50))
 
     end = time.time()
 
