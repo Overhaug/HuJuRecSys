@@ -11,20 +11,24 @@ import pandas as pd
 import pytz
 import re
 import os
+from zipfile import ZipFile
+from PIL import Image
 
 
-def main(_max=0, batch_size=5000, images=False):
+def main(_max=0, batch_size=5000, images=False, path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl'):
     articles = []
     num = 0
-    with open('../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl', 'rb') as f:
+    with open(path, 'rb') as f:
         article_sublist = []
         for article in jl.reader(f):
             article = convert_unix_to_datetime(article)
             article = add_image_url(article)
             article = remove_type_from_object(article)
-            
+
             if article is not None:
-                articles.append(article)
+                articles.append(article)  # There are a handful of empty objects in the dataset
+            else:
+                continue
             if len(articles) == batch_size:
                 num_of_items = batch_size
                 if images:
@@ -37,7 +41,7 @@ def main(_max=0, batch_size=5000, images=False):
                 else:
                     print('Processed {} articles'.format(num))
                 get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
-                #get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
+                get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
                 articles = []
                 if _max - num in range(-25, 25):
                     break
@@ -45,19 +49,56 @@ def main(_max=0, batch_size=5000, images=False):
     return articles
 
 
-def get_images(article_sublist, articles, num):
-    fetcher = ImageFetcher((x['url'] for x in article_sublist),
-                           (y['id'] for y in article_sublist))
-
+def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incompleteURL=None,
+               incompleteID=None, batch_size=50, _max=None):
     print('Fetching images ...')
+    global _start
+
+    def batch_instance(retry=False, incompleteURL=incompleteURL, incompleteID=incompleteID):
+        if filepath is not None and retry is False:
+            with open(filepath, 'r', encoding='utf-8') as file_handler:
+                df = pd.read_csv(file_handler)
+                print(_start, _max, batch_size)
+                image_fetch = ImageFetcher(df['id'][_start:_start+batch_size], df['url'][_start:_start+batch_size])
+                return image_fetch
+        if filepath is not None and retry is True:
+            image_fetch = ImageFetcher(incompleteID, incompleteURL)
+            return image_fetch
+
+    if incompleteURL is None:
+        fetcher = batch_instance()
+    else:
+        fetcher = batch_instance(retry=True)
+
     started = time.time()
     fetcher.get()
 
-    if len(fetcher.incomplete) > 0:
-        articles = remove_failed_objects(fetcher.incomplete, articles)
-        num -= len(fetcher.incomplete)
-    print("Fetched {} images in {} seconds".format(num, time.time() - started))
-    return len(articles)
+    num = 0
+    if fetcher.incompleteID is not None:
+        num -= len(fetcher.incompleteID)
+        print("Fetched {} images in {} seconds".format(num, time.time() - started))
+
+        print('{}'.format(len(fetcher.incompleteID)))
+        print('Trying again')
+        get_images(incompleteURL=fetcher.incompleteURL, incompleteID=fetcher.incompleteID)
+
+    resize_images(fetcher.ids)
+
+
+CONST_BATCH_SIZE = 0
+_start = 0
+def image_fetcher(batch_size=50, _max=None):
+    global CONST_BATCH_SIZE
+    CONST_BATCH_SIZE = batch_size
+    global _start
+    while True:
+        if _max is None:
+            get_images(batch_size=batch_size)
+        elif _max is _start:
+            break
+        else:
+            get_images(batch_size=batch_size, _max=_max)
+        _start += CONST_BATCH_SIZE
 
 
 # Removes "type" property from object
@@ -75,9 +116,12 @@ def add_image_url(item):
 
 # Fetches image URL on the current article.
 def get_singular_image_url(current_article):
+    urls = []
     for content in current_article['contents']:
         if content is not None and content['type'] == 'image':
-            return str(content['imageURL'])
+            if content['imageURL'] not in urls:
+                urls.append(str(content['imageURL']))
+                return str(content['imageURL'])
 
 
 # Convert unix dates to datetime string
@@ -120,82 +164,141 @@ def get_as_json(articles):
 # returns a list of id-imageURL objects
 def get_image_url(article):
     urls_list = []
+    simple_urls = []
     for index in range(len(article)):
         urls = {}
         num = 0
         for content in article[index]['contents']:
             if content is not None and content['type'] == 'image':
-                urls['id'] = article[index]['id'] + '-' + str(num)
-                urls['url'] = content['imageURL']
-                urls_list.append(urls)
-                num += 1
-                urls = {}
-        num = 0
+                if content['imageURL'] not in simple_urls:
+                    urls['id'] = article[index]['id'] + '-' + str(num)
+                    urls['url'] = content['imageURL']
+                    urls_list.append(urls)
+                    num += 1
+                    urls = {}
     return urls_list
 
 
 # Writes data as csv
-def get_as_csv(d, path, convert=True):
+def get_as_csv(data, path, convert=True):
     if convert:
-        f = from_array_to_string(d)
-        df = pd.DataFrame(f)
+        processed_data = from_array_to_string(data)
+        df = pd.DataFrame(processed_data)
     else:
-        df = pd.DataFrame(d)
+        df = pd.DataFrame(data)
 
     if os.path.exists(path):
-        with open(path, 'a', encoding='utf-8') as x:
-            df.to_csv(x, sep=',', index=False, header=False)
+        with open(path, 'a', encoding='utf-8') as existing_file:
+            df.to_csv(existing_file, sep=',', index=False, header=False)
     else:
-        with open(path, 'w', encoding='utf-8') as f:
-            df.to_csv(f, sep=',', index=False, header=True)
+        with open(path, 'w', encoding='utf-8') as new_file:
+            df.to_csv(new_file, sep=',', index=False, header=True)
 
 
 # Extract all content objects (in a json array) of type paragraph to a single string
-def from_array_to_string(d):
+# passed list looks like this:
+# [
+#    {
+#        'id': '19239-123-fw-efwf-1231',
+#        .....
+#        'contents':
+#            {
+#                'type': 'santized_html',
+#                'subtype': 'paragraph',
+#            }
+#    }
+# ]
+def from_array_to_string(articles):
     content_string = ''
 
-    for x in d:
-        for k, v in x.items():
-            if k == 'contents':
-                for i in v:
-                    if i is not None:
-                        for e, h in i.items():
-                            if e == 'subtype' and h == 'paragraph':
-                                plain_text = html_to_text(i['content'])
+    for article in articles:
+        for key, value in article.items():
+            if key == 'contents':
+                for content in value:
+                    if content is not None:
+                        for cKey, cValue in content.items():
+                            if cKey == 'subtype' and cValue == 'paragraph':
+                                plain_text = html_to_text(content['content'])
+                                plain_text = remove_urls_from_text(plain_text)
                                 content_string += plain_text
-                x.pop(k)
-                x['text'] = content_string
+                article.pop(key)  # Deletes JSON array
+                article['text'] = content_string  # Adds a new key-value, simple plain text
                 content_string = ''
-    return d
+    return articles
+
+
+def remove_urls_from_text(article):
+    article = article.split()
+    new_string = ' '
+    for word in range(len(article)):
+        if article[word].startswith('http') \
+                or article[word].endswith('>') \
+                or article[word].startswith('<'):
+            if article[word].__contains__('>'):
+                word_list = article[word].split('>')
+                word_list.remove(word_list[0])
+                index = article.index(article[word])
+                s = ''
+                s.join(word_list)
+                article.insert(index, s)
+            else:
+                article.insert(word, '')
+    return new_string.join(article)
 
 
 def html_to_text(text):
-    clean = re.compile('<.*?>')
-    return str(re.sub(clean, '', text))
+    clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    return str(re.sub(clean, ' ', text))
+
+
+def resize_images(ids):
+    files = []
+    filenames = []
+
+    d = '../HuJuData/data/processed/images/'
+    for path in os.listdir(d):
+        full_path = os.path.join(d, path)
+        if os.path.isfile(full_path) and path in ids and str(full_path).endswith('jpeg'):
+            files.append(full_path)
+            filenames.append(path)
+
+    size = 400, 400
+    for img in files:
+        try:
+            im = Image.open(img)
+            im.thumbnail(size, Image.ANTIALIAS)
+            index = files.index(img)
+            im.save(d+filenames[index], "JPEG")
+        except IOError:
+            print('Could not resize {}'.format(img))
 
 
 # Downloads images from a given list of urls
 # Filenames equate to article ID
 class ImageFetcher:
-    def __init__(self, url, ids):
-        self.ids = [x for x in ids]
-        self.urls = [x for x in url]
-        self.incomplete = []
+    def __init__(self, ids, url, incompleteURL=None, incompleteID=None):
+        self.incompleteURL = incompleteURL
+        self.incompleteID = incompleteID
+        if incompleteID is not None:
+            self.ids = [x for x in incompleteID]
+            self.urls = [x for x in incompleteURL]
+        else:
+            self.ids = [x for x in ids]
+            self.urls = [x for x in url]
 
     def exception(self, request, exception):
         print("Problem: {}: {}".format(request.url, exception))
-        self.incomplete.append(request.url)
-        index = self.urls.index(request.url)
-        del self.ids[index]
-        del self.urls[index]
+        self.urls.append(request.url)
+        self.ids.append(self.urls.index(request.url))
 
-    def get(self):
+    def get(self, limit=50):
         results = grequests.map((grequests.get(u) for u in self.urls),
                                 exception_handler=self.exception,
-                                size=50,
-                                stream=True)
+                                size=limit,
+                                stream=False)
         for x in range(len(self.urls)):
-            with open('../HuJuData/data/processed/images/' + self.ids[x] + '.jpg', 'wb') as handler:
+            path = '../HuJuData/data/processed/images/' + self.ids[x] + '.jpeg'
+            with open(path, 'wb') as handler:
                 if results[x] is not None:
                     handler.write(results[x].content)
                     results[x].close()
@@ -203,10 +306,26 @@ class ImageFetcher:
                     print('Request at index {} failed'.format(x))
 
 
+def extract_only_image_urls(path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl', batch_size=20000):
+    articles = []
+    num = 0
+    with open(path, 'rb') as file_reader:
+        for article in jl.reader(file_reader):
+            articles.append(article)
+            if len(articles) == batch_size:
+                get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
+                num += len(articles)
+                articles = []
+                print(num)
+
+
 if __name__ == '__main__':
     start = time.time()
 
-    main(batch_size=30000, _max=0)
+    #main(batch_size=50000, _max=0)
+    # extract_only_image_urls(batch_size=50000)
+    # get_images(batch_size=10, _max=1000)
+    image_fetcher(batch_size=100, _max=1000)
 
     end = time.time()
 
