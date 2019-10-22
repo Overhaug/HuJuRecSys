@@ -2,6 +2,8 @@
 # A script to extract data from the Washington Post corpus, as well as images attached to the articles
 
 import json
+import os
+import re
 import time
 from datetime import datetime as dt
 
@@ -9,96 +11,35 @@ import grequests
 import json_lines as jl
 import pandas as pd
 import pytz
-import re
-import os
-from zipfile import ZipFile
 from PIL import Image
 
 
-def main(_max=0, batch_size=5000, images=False, path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl'):
+def main(_max=None, batch_size=5000, path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl'):
     articles = []
     num = 0
     with open(path, 'rb') as f:
-        article_sublist = []
         for article in jl.reader(f):
-            article = convert_unix_to_datetime(article)
+            article = convert_unix_to_datetime(article) if not False else convert_unix_to_datetime(article)
             article = add_image_url(article)
             article = remove_type_from_object(article)
-
             if article is not None:
                 articles.append(article)  # There are a handful of empty objects in the dataset
             else:
                 continue
             if len(articles) == batch_size:
-                num_of_items = batch_size
-                if images:
-                    get_images(article_sublist, articles, num_of_items)
-                article_sublist = []
-
-                num += num_of_items
-                if _max is not 0:
+                num += batch_size
+                get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
+                articles = []
+                if _max is not None:
                     print(num, 'of', _max)
                 else:
                     print('Processed {} articles'.format(num))
-                get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
-                get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
-                articles = []
-                if _max - num in range(-25, 25):
-                    break
+                if _max is not None and _max - num in range(-25, 25):
+                    return
+        print('Processed {} articles'.format(num))
+        get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
     f.close()
     return articles
-
-
-def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incompleteURL=None,
-               incompleteID=None, batch_size=50, _max=None):
-    print('Fetching images ...')
-    global _start
-
-    def batch_instance(retry=False, incompleteURL=incompleteURL, incompleteID=incompleteID):
-        if filepath is not None and retry is False:
-            with open(filepath, 'r', encoding='utf-8') as file_handler:
-                df = pd.read_csv(file_handler)
-                print(_start, _max, batch_size)
-                image_fetch = ImageFetcher(df['id'][_start:_start+batch_size], df['url'][_start:_start+batch_size])
-                return image_fetch
-        if filepath is not None and retry is True:
-            image_fetch = ImageFetcher(incompleteID, incompleteURL)
-            return image_fetch
-
-    if incompleteURL is None:
-        fetcher = batch_instance()
-    else:
-        fetcher = batch_instance(retry=True)
-
-    started = time.time()
-    fetcher.get()
-
-    num = 0
-    if fetcher.incompleteID is not None:
-        num -= len(fetcher.incompleteID)
-        print("Fetched {} images in {} seconds".format(num, time.time() - started))
-
-        print('{}'.format(len(fetcher.incompleteID)))
-        print('Trying again')
-        get_images(incompleteURL=fetcher.incompleteURL, incompleteID=fetcher.incompleteID)
-
-    resize_images(fetcher.ids)
-
-
-CONST_BATCH_SIZE = 0
-_start = 0
-def image_fetcher(batch_size=50, _max=None):
-    global CONST_BATCH_SIZE
-    CONST_BATCH_SIZE = batch_size
-    global _start
-    while True:
-        if _max is None:
-            get_images(batch_size=batch_size)
-        elif _max is _start:
-            break
-        else:
-            get_images(batch_size=batch_size, _max=_max)
-        _start += CONST_BATCH_SIZE
 
 
 # Removes "type" property from object
@@ -116,12 +57,10 @@ def add_image_url(item):
 
 # Fetches image URL on the current article.
 def get_singular_image_url(current_article):
-    urls = []
     for content in current_article['contents']:
         if content is not None and content['type'] == 'image':
-            if content['imageURL'] not in urls:
-                urls.append(str(content['imageURL']))
-                return str(content['imageURL'])
+            return str(content['imageURL'])
+    return 'null'
 
 
 # Convert unix dates to datetime string
@@ -132,6 +71,10 @@ def convert_unix_to_datetime(item):
             .strftime('%Y-%m-%d')
     except TypeError:
         print('Unable to convert {} '.format(item['published_date']))
+        return False
+    except OSError:
+        print('Invalid argument {}'.format(item['published_date']))  # Seemingly triggers only when published_date is 0
+        return False
     return item
 
 
@@ -164,19 +107,30 @@ def get_as_json(articles):
 # returns a list of id-imageURL objects
 def get_image_url(article):
     urls_list = []
-    simple_urls = []
     for index in range(len(article)):
         urls = {}
         num = 0
         for content in article[index]['contents']:
             if content is not None and content['type'] == 'image':
-                if content['imageURL'] not in simple_urls:
-                    urls['id'] = article[index]['id'] + '-' + str(num)
-                    urls['url'] = content['imageURL']
-                    urls_list.append(urls)
-                    num += 1
-                    urls = {}
+                urls['id'] = article[index]['id'] + '-' + str(num)
+                urls['url'] = content['imageURL']
+                urls_list.append(urls)
+                num += 1
+                urls = {}
     return urls_list
+
+
+def extract_only_image_urls(path='../HuJuData/data/corpus/TWPC.jl', batch_size=20000):
+    articles = []
+    num = 0
+    with open(path, 'rb') as file_reader:
+        for article in jl.reader(file_reader):
+            articles.append(article)
+            if len(articles) == batch_size:
+                get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
+                num += len(articles)
+                articles = []
+        get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
 
 
 # Writes data as csv
@@ -188,29 +142,14 @@ def get_as_csv(data, path, convert=True):
         df = pd.DataFrame(data)
 
     if os.path.exists(path):
-        with open(path, 'a', encoding='utf-8') as existing_file:
-            df.to_csv(existing_file, sep=',', index=False, header=False)
+        df.to_csv(path, sep=',', index=False, header=False, mode='a')
     else:
-        with open(path, 'w', encoding='utf-8') as new_file:
-            df.to_csv(new_file, sep=',', index=False, header=True)
+        df.to_csv(path, sep=',', index=False, header=True, mode='w')
 
 
 # Extract all content objects (in a json array) of type paragraph to a single string
-# passed list looks like this:
-# [
-#    {
-#        'id': '19239-123-fw-efwf-1231',
-#        .....
-#        'contents':
-#            {
-#                'type': 'santized_html',
-#                'subtype': 'paragraph',
-#            }
-#    }
-# ]
 def from_array_to_string(articles):
-    content_string = ''
-
+    content_string = ' '
     for article in articles:
         for key, value in article.items():
             if key == 'contents':
@@ -223,112 +162,184 @@ def from_array_to_string(articles):
                                 content_string += plain_text
                 article.pop(key)  # Deletes JSON array
                 article['text'] = content_string  # Adds a new key-value, simple plain text
-                content_string = ''
+                content_string = ' '
     return articles
 
 
 def remove_urls_from_text(article):
     article = article.split()
-    new_string = ' '
+    new_string = ''
     for word in range(len(article)):
-        if article[word].startswith('http') \
-                or article[word].endswith('>') \
-                or article[word].startswith('<'):
-            if article[word].__contains__('>'):
-                word_list = article[word].split('>')
-                word_list.remove(word_list[0])
-                index = article.index(article[word])
-                s = ''
-                s.join(word_list)
-                article.insert(index, s)
-            else:
-                article.insert(word, '')
-    return new_string.join(article)
+        new_string += ' '
+        x = re.sub(r'^https?:\/\/.*[\r\n]*', '', article[word], flags=re.MULTILINE)
+        new_string += x
+    return new_string
 
 
+# Standard regex for cleaning html tags
 def html_to_text(text):
     clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
-    return str(re.sub(clean, ' ', text))
+    return str(re.sub(clean, '', text))
 
 
+# Resize a set of images
 def resize_images(ids):
     files = []
     filenames = []
 
+    file_types = ('JPG', 'PNG', 'TIF')
     d = '../HuJuData/data/processed/images/'
     for path in os.listdir(d):
         full_path = os.path.join(d, path)
-        if os.path.isfile(full_path) and path in ids and str(full_path).endswith('jpeg'):
+        if os.path.isfile(full_path) and path.split('.')[0] in ids and str(full_path.upper()).endswith(file_types):
             files.append(full_path)
             filenames.append(path)
 
     size = 400, 400
     for img in files:
+        index = files.index(img)
         try:
-            im = Image.open(img)
+            print(get_image_extension(img).upper())
+            if get_image_extension(img).upper() is '.PNG':
+                im = Image.open(Image.composite(img, Image.new('RGB', img.size, 'white'), img))
+            else:
+                im = Image.open(img)
+            # im = Image.open(img)
             im.thumbnail(size, Image.ANTIALIAS)
-            index = files.index(img)
-            im.save(d+filenames[index], "JPEG")
+            im.save(d + filenames[index], set_image_extension(get_image_extension(img)))
         except IOError:
             print('Could not resize {}'.format(img))
+        validate_image(files[index])
+
+
+def get_image_extension(string):
+    str(string)
+    i = string.rfind('.')
+    return string[i:]
+
+
+def set_image_extension(ext):
+    ext = ext.upper()
+    if ext is 'JPG' or 'JPEG': return 'JPEG'
+    if ext is 'PNG': return 'PNG'
+    if ext is 'TIF' or 'TIFF': return 'TIFF'
+    if ext is 'GIF': return 'GIF'
+
+
+# If the image can be opened, assume it is a valid file
+def validate_image(image):
+    try:
+        Image.open(image)
+    except OSError:
+        file_name = image[image.rfind('/'):]
+        print(get_image_extension(file_name[file_name.find('.'):]))
+        if get_image_extension(file_name[file_name.find('.'):]).upper() is '.PNG':
+            try:
+                Image.open(Image.composite(image, Image.new('RGB', image.size, 'white'), image))
+            except OSError:
+                print('Image {} could not be validated and will be removed'.format(file_name))
+                os.remove(image)
 
 
 # Downloads images from a given list of urls
 # Filenames equate to article ID
 class ImageFetcher:
     def __init__(self, ids, url, incompleteURL=None, incompleteID=None):
-        self.incompleteURL = incompleteURL
-        self.incompleteID = incompleteID
-        if incompleteID is not None:
-            self.ids = [x for x in incompleteID]
-            self.urls = [x for x in incompleteURL]
-        else:
+        self.incompleteID = None
+        self.incompleteURL = None
+        if incompleteID is None:
             self.ids = [x for x in ids]
             self.urls = [x for x in url]
+        else:
+            self.ids = [x for x in incompleteID]
+            self.urls = [x for x in incompleteURL]
+
+    def add_failed_requests(self, id, url):
+        if self.incompleteID is None:
+            self.incompleteID = list().append(id)
+            self.incompleteURL = list().append(url)
+        else:
+            self.incompleteID.append(id)
+            self.incompleteURL.append(url)
 
     def exception(self, request, exception):
         print("Problem: {}: {}".format(request.url, exception))
-        self.urls.append(request.url)
-        self.ids.append(self.urls.index(request.url))
+        self.add_failed_requests(self.urls.index(request.url), request.url)
 
-    def get(self, limit=50):
+    def get(self, limit=None):
         results = grequests.map((grequests.get(u) for u in self.urls),
                                 exception_handler=self.exception,
                                 size=limit,
                                 stream=False)
         for x in range(len(self.urls)):
-            path = '../HuJuData/data/processed/images/' + self.ids[x] + '.jpeg'
-            with open(path, 'wb') as handler:
-                if results[x] is not None:
+            if results[x] is not None:
+                path = '../HuJuData/data/processed/images/' + self.ids[x] + get_image_extension(results[x].url)
+                with open(path, 'wb') as handler:
                     handler.write(results[x].content)
-                    results[x].close()
-                else:
-                    print('Request at index {} failed'.format(x))
+                results[x].close()
+            else:
+                print('Request at index {} failed'.format(x))
 
 
-def extract_only_image_urls(path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl', batch_size=20000):
-    articles = []
-    num = 0
-    with open(path, 'rb') as file_reader:
-        for article in jl.reader(file_reader):
-            articles.append(article)
-            if len(articles) == batch_size:
-                get_as_csv(get_image_url(articles), path='../HuJuData/data/processed/image_urls.csv', convert=False)
-                num += len(articles)
-                articles = []
-                print(num)
+def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_urls=None,
+               incomplete_ids=None, batch_size=50, _max=None, start_index=0):
+    def batch_instance(retry=False):
+        if filepath is not None and retry is False:
+            with open(filepath, 'r', encoding='utf-8') as file_handler:
+                df = pd.read_csv(file_handler)
+                print('Fetching images from index {} to {} of {}'.format(start_index, start_index + batch_size, _max - start_index))
+                image_fetch = ImageFetcher(df['id'][start_index:start_index + batch_size],
+                                           df['url'][start_index:start_index + batch_size])
+                return image_fetch
+        if filepath is not None and retry is True:
+            image_fetch = ImageFetcher(incomplete_ids, incomplete_urls)
+            return image_fetch
+
+    if incomplete_urls is None:
+        fetcher = batch_instance()
+    else:
+        fetcher = batch_instance(retry=True)
+
+    fetcher.get(limit=50)
+
+    if fetcher.incompleteID is not None:
+        num_successful = batch_size - len(fetcher.incompleteID)
+        print("Fetched {} images, but failed {}".format(num_successful, len(fetcher.incompleteID)))
+        print('Retrying failed requests ...')
+        time.sleep(5)
+        get_images(batch_size=batch_size, start_index=start_index, _max=_max,
+                   incomplete_urls=fetcher.incompleteURL, incomplete_ids=fetcher.incompleteID)
+
+    try:
+        fetcher.ids = set(fetcher.ids) - set(fetcher.incompleteID)
+    except TypeError:
+        print('No failed requests')
+
+    resize_images(list(fetcher.ids))
+
+
+def image_fetcher(start_index=0, batch_size=50, _max=None):
+    const_batch_size = batch_size
+    const_start = start_index
+    _max = const_start + _max
+    while True:
+        if start_index is _max:
+            return False
+        elif _max is None:
+            get_images(batch_size=batch_size, start_index=start_index)
+            start_index += const_batch_size
+        else:
+            get_images(batch_size=batch_size, start_index=start_index, _max=_max)
+            start_index += const_batch_size
 
 
 if __name__ == '__main__':
     start = time.time()
 
-    #main(batch_size=50000, _max=0)
-    # extract_only_image_urls(batch_size=50000)
-    # get_images(batch_size=10, _max=1000)
-    image_fetcher(batch_size=100, _max=1000)
+    # main(batch_size=100000)
+    # extract_only_image_urls(batch_size=200000)
+    image_fetcher(batch_size=100, start_index=303000, _max=5000)
 
     end = time.time()
-
     time = end - start
-
     print("Process took ~{:.3g} minutes".format(int(time) / 60))
