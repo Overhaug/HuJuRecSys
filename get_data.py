@@ -14,8 +14,6 @@ import pandas as pd
 import pytz
 from PIL import Image
 
-no_allowable_errors = 0
-
 
 def main(_max=None, batch_size=5000, path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl'):
     articles = []
@@ -295,7 +293,6 @@ class ImageFetcher:
             self.status_codes.append(exception)
 
     def exception(self, request, exception):
-        global no_allowable_errors
         print("Problem: {}: {}".format(request.url, exception))
         index = self.urls.index(request.url)
         if str(exception).__contains__('No schema supplied'):
@@ -315,11 +312,6 @@ class ImageFetcher:
             elif request.status_code[0] is 5:
                 print('Server error {}'.format(request.status_code))
                 self.add_failed_requests(self.ids[index], self.urls[index], exception)
-                no_allowable_errors += 1
-                if str(no_allowable_errors).endswith('0'):
-                    print('{} server errors thus far in this batch. Waiting 30 seconds before retrying ...'
-                          .format(no_allowable_errors))
-                    time.sleep(30)
         else:
             self.add_failed_requests(self.ids[index], self.urls[index], exception)
 
@@ -327,7 +319,8 @@ class ImageFetcher:
         results = grequests.map((grequests.get(u) for u in self.urls),
                                 exception_handler=self.exception,
                                 size=limit,
-                                stream=False)
+                                stream=True,
+                                gtimeout=180)
         failed = 0
         for x in range(len(self.urls)):
             if results[x] is not None:
@@ -338,6 +331,8 @@ class ImageFetcher:
                     sys.stdout.write('\r' + 'Saved {} images ... '.format(str(x + 1 - failed)))
                 results[x].close()
             else:
+                if self.ids[x] not in self.incompleteID:
+                    self.add_failed_requests(self.ids[x], self.urls[x], 'Gevent joinall timeout')
                 failed += 1
         print('Fetched and processed {} images, failed {}'.format(str(len(results) - failed), failed))
 
@@ -371,14 +366,14 @@ def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_
     # resize_images(list(fetcher.ids))
 
     if fetcher.incompleteID is not None:
-        if recursion_depth is not 5:
+        if recursion_depth is not 1:
             print('Retrying failed requests ...')
             time.sleep(5)
             get_images(batch_size=batch_size, start_index=start_index, _max=_max,
                        incomplete_urls=fetcher.incompleteURL, incomplete_ids=fetcher.incompleteID,
                        recursion_depth=recursion_depth + 1)
         else:
-            print('Exceeded recursion depth limit of 5.')
+            print('Retry failed')
             print('Current failed requests added to log and must be manually retried')
             print('Failed requests:')
             print(fetcher.incompleteID)
@@ -393,7 +388,6 @@ def image_fetcher(start_index=0, batch_size=50, _max=None):
     const_batch_size = batch_size
     const_start = start_index
     _max = int(const_start + _max) if _max is not None else _max
-    global no_allowable_errors
     start_of_process = time.time()
 
     while True:
@@ -411,7 +405,6 @@ def image_fetcher(start_index=0, batch_size=50, _max=None):
         print('Processed {} in {:.3g} seconds'.format(batch_size, end_time - start_time))
         print('Minutes running: ~{:.3g}'.format(int(total_time) / 60))
         print('---------------------------------------------------------------------')
-        no_allowable_errors = 0
         _max = _max - start_index if _max is not None else _max
 
 
@@ -419,7 +412,7 @@ if __name__ == '__main__':
     start = time.time()
     # main(batch_size=100000)
     # extract_only_image_urls(batch_size=50000)
-    image_fetcher(batch_size=1000, start_index=200000)
+    image_fetcher(batch_size=1000, start_index=233000)
 
     end = time.time()
     time = end - start
