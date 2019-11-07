@@ -185,17 +185,26 @@ def html_to_text(text):
 
 
 # Resize a set of images
-def resize_images(ids):
+def resize_images(file_dir=None, batch_size=10):
     files = []
     filenames = []
 
     file_types = ('JPEG', 'JPG', 'PNG', 'TIFF', 'TIF')
-    d = '../HuJuData/data/processed/images/'
-    for path in os.listdir(d):
+    d = 'E:/images/'
+    new = 'E:/resized/'
+    n = 0
+
+    if file_dir is None:
+        file_dir = os.listdir(d)
+    for path in file_dir:
         full_path = os.path.join(d, path)
-        if os.path.isfile(full_path) and path.split('.')[0] in ids and str(full_path.upper()).endswith(file_types):
+        if os.path.isfile(full_path) and str(full_path.upper()).endswith(file_types):
             files.append(full_path)
             filenames.append(path)
+            n += 1
+            if n == batch_size:
+                print(n)
+                break
     size = 400, 400
     for img in files:
         index = files.index(img)
@@ -205,10 +214,11 @@ def resize_images(ids):
             else:
                 im = Image.open(img)
             im.thumbnail(size, Image.ANTIALIAS)
-            im.save(d + filenames[index], get_image_extension(filenames[index])[1:])
+            im.save(new + filenames[index], get_image_extension(filenames[index])[1:])
         except IOError:
             print('Could not resize {}'.format(img))
-            validate_image(img)
+            # validate_image(img)
+    resize_images(file_dir=[x for x in file_dir if x not in filenames])
 
 
 def set_image_extension(ext):
@@ -244,7 +254,7 @@ def validate_image(image):
 
 
 def log_failed_requests(id, url, status_code):
-    if len(id) > 1:
+    if isinstance(id, list):
         entities = {
             'id': [],
             'url': [],
@@ -252,7 +262,9 @@ def log_failed_requests(id, url, status_code):
         }
         for x in range(len(id)):
             entities['id'].append(id[x])
-            entities['url'].append(url[x])
+            url_string = url[x] if str(url[x]).startswith('http') else 'nan'  # input nan for empty urls
+            str(url_string).replace(',', '')  # Remove commas since we're using CSVs
+            entities['url'].append(url_string)
             entities['status_code'].append(status_code[x])
         get_as_csv(data=entities, path='../HuJuData/data/logs/log_failed_requests.csv', convert=False)
     else:
@@ -260,12 +272,15 @@ def log_failed_requests(id, url, status_code):
                    path='../HuJuData/data/logs/log_failed_requests.csv', convert=False)
 
 
-def check_log(id):
+def exists_in_log(id):
     df = pd.read_csv('../HuJuData/data/logs/log_failed_requests.csv')
-    count = df['id'].count(id)
-    if count == 3:
-        return False
-    return True
+    count = 0
+    for ids in df['id'].values:
+        if ids is id:
+            count += 1
+    if count >= 1:
+        return True
+    return False
 
 
 # Downloads images from a given list of urls
@@ -296,15 +311,15 @@ class ImageFetcher:
         print("Problem: {}: {}".format(request.url, exception))
         index = self.urls.index(request.url)
         if str(exception).__contains__('No schema supplied'):
-            log_failed_requests(self.ids[index], self.urls[index], exception)
-            print('Added to log')
+            if not exists_in_log(self.ids[index]):
+                self.add_failed_requests(self.ids[index], None, exception)
+            else:
+                self.add_failed_requests(self.ids[index], None, exception)
         elif hasattr(request, 'status_code'):
             if request.statuscode[0] is 4:
                 print(request.status_code)
-                if not check_log(self.ids[index]):
-                    log_failed_requests(self.ids[index], self.urls[index], request.status_code)
+                if not exists_in_log(self.ids[index]):
                     self.add_failed_requests(self.ids[index], self.urls[index], exception)
-                    print('Added to log')
                 else:
                     print(
                         'Request at index {} failed more than 3 times with a client-side error or "No schema supplied".'
@@ -319,22 +334,28 @@ class ImageFetcher:
         results = grequests.map((grequests.get(u) for u in self.urls),
                                 exception_handler=self.exception,
                                 size=limit,
-                                stream=True,
-                                gtimeout=180)
+                                stream=False,
+                                gtimeout=240)
         failed = 0
+        timestart = time.time()
         for x in range(len(self.urls)):
             if results[x] is not None:
                 ext = get_image_extension(self.urls[x])
-                path = '/Volumes/Intern SATA/images/' + self.ids[x] + '.' + set_image_extension(ext)
+                path = 'E:/missing/' + self.ids[x] + '.' + set_image_extension(ext)
                 with open(path, 'wb') as handler:
                     handler.write(results[x].content)
                     sys.stdout.write('\r' + 'Saved {} images ... '.format(str(x + 1 - failed)))
                 results[x].close()
             else:
-                if self.ids[x] not in self.incompleteID:
+                try:
+                    if self.ids[x] not in self.incompleteID:
+                        self.add_failed_requests(self.ids[x], self.urls[x], 'Gevent joinall timeout')
+                except TypeError:
                     self.add_failed_requests(self.ids[x], self.urls[x], 'Gevent joinall timeout')
                 failed += 1
+        timeend = time.time()
         print('Fetched and processed {} images, failed {}'.format(str(len(results) - failed), failed))
+        print('Saving images took {:.3g}'.format(timeend - timestart))
 
 
 def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_urls=None,
@@ -350,8 +371,8 @@ def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_
                     image_fetch = ImageFetcher(df['id'][start_index:start_index + batch_size],
                                                df['url'][start_index:start_index + batch_size])
                 except IndexError:
-                    image_fetch = ImageFetcher(df['id'][start_index:len(df)],
-                                               df['url'][start_index:len(df)])
+                    image_fetch = ImageFetcher(df['id'][start_index:656072],
+                                               df['url'][start_index:656072])
                 return image_fetch
         if filepath is not None and retry is True:
             image_fetch = ImageFetcher(incomplete_ids, incomplete_urls)
@@ -362,8 +383,7 @@ def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_
     else:
         fetcher = batch_instance(retry=True)
 
-    fetcher.get(limit=250)
-    # resize_images(list(fetcher.ids))
+    fetcher.get(limit=100)
 
     if fetcher.incompleteID is not None:
         if recursion_depth is not 1:
@@ -373,12 +393,10 @@ def get_images(filepath='../HuJuData/data/processed/image_urls.csv', incomplete_
                        incomplete_urls=fetcher.incompleteURL, incomplete_ids=fetcher.incompleteID,
                        recursion_depth=recursion_depth + 1)
         else:
-            print('Retry failed')
-            print('Current failed requests added to log and must be manually retried')
-            print('Failed requests:')
-            print(fetcher.incompleteID)
-            print(fetcher.incompleteURL)
             log_failed_requests(fetcher.incompleteID, fetcher.incompleteURL, fetcher.status_codes)
+            print('Failed requests added to log and must be manually retried')
+            for c1, c2 in zip(fetcher.incompleteID, fetcher.incompleteURL):
+                print("%-9s %s" % (c1, c2))
             return
     else:
         print('No failed requests')
@@ -389,7 +407,7 @@ def image_fetcher(start_index=0, batch_size=50, _max=None):
     const_start = start_index
     _max = int(const_start + _max) if _max is not None else _max
     start_of_process = time.time()
-
+    total = 0
     while True:
         start_time = time.time()
         if start_index is _max:
@@ -402,18 +420,20 @@ def image_fetcher(start_index=0, batch_size=50, _max=None):
             start_index += const_batch_size
         end_time = time.time()
         total_time = end_time - start_of_process
+        total += batch_size
         print('Processed {} in {:.3g} seconds'.format(batch_size, end_time - start_time))
-        print('Minutes running: ~{:.3g}'.format(int(total_time) / 60))
+        print('Progress: {} in ~{:.3g}'.format(total, int(total_time) / 60))
         print('---------------------------------------------------------------------')
         _max = _max - start_index if _max is not None else _max
 
 
 if __name__ == '__main__':
-    start = time.time()
     # main(batch_size=100000)
     # extract_only_image_urls(batch_size=50000)
-    image_fetcher(batch_size=1000, start_index=233000)
-
-    end = time.time()
-    time = end - start
-    print("Process took ~{:.3g} minutes".format(int(time) / 60))
+    # image_fetcher(batch_size=1000, start_index=0)
+    # move_files(source='../HuJuData/data/processed/images/', destination='E:/images/')
+    # move_files(source='E:/images/', destination='F:/imgs/', copy=True)
+    s = time.time()
+    resize_images()
+    e = time.time()
+    print('{:.3g} mins'.format(e-s))
