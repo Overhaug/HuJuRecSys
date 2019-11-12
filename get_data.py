@@ -14,15 +14,21 @@ import pandas as pd
 import pytz
 from PIL import Image
 
+from bs4 import BeautifulSoup
 
-def main(_max=None, batch_size=5000, path='../HuJuData/data/corpus/TREC_Washington_Post_collection.v2.jl'):
+
+def main(_max=None, batch_size=5000, path='../HuJuData/data/corpus/TWPC.jl'):
     articles = []
     num = 0
     with open(path, 'rb') as f:
         for article in jl.reader(f):
             article = convert_unix_to_datetime(article) if not False else convert_unix_to_datetime(article)
             article = add_image_url(article)
-            article = remove_type_from_object(article)
+            if article['author'] is '' or article['author'] is None:
+                article = get_author(article)
+                article['subtype'] = 'compilation'
+            else:
+                article['subtype'] = 'standalone'
             if article is not None:
                 articles.append(article)  # There are a handful of empty objects in the dataset
             else:
@@ -41,6 +47,19 @@ def main(_max=None, batch_size=5000, path='../HuJuData/data/corpus/TREC_Washingt
         get_as_csv(articles, path='../HuJuData/data/processed/corpus_csv.csv')
     f.close()
     return articles
+
+
+def get_author(article):
+    for k, v in article.items():
+        if k == 'contents':
+            for i in v:
+                for key, content in i.items():
+                    if str(content).__contains__('Compiled by'):
+                        clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+                        text = str(re.sub(clean, '', content))
+                        i = str(text).find('by')
+                        article['author'] = str(text)[i+3:]
+                        return article
 
 
 # Removes "type" property from object
@@ -151,7 +170,7 @@ def get_as_csv(data, path, convert=True):
 
 # Extract all content objects (in a json array) of type paragraph to a single string
 def from_array_to_string(articles):
-    content_string = ' '
+    content_array = []
     for article in articles:
         for key, value in article.items():
             if key == 'contents':
@@ -159,12 +178,12 @@ def from_array_to_string(articles):
                     if content is not None:
                         for cKey, cValue in content.items():
                             if cKey == 'subtype' and cValue == 'paragraph':
-                                plain_text = html_to_text(content['content'])
-                                plain_text = remove_urls_from_text(plain_text)
-                                content_string += plain_text
-                article.pop(key)  # Deletes JSON array
-                article['text'] = content_string  # Adds a new key-value, simple plain text
-                content_string = ' '
+                                content_array.append(html_to_text(content['content']) + '<br><br>')
+                                # plain_text = remove_urls_from_text(plain_text)
+                del article[key]  # Deletes JSON array
+                content_string = ' '.join(content_array).replace('\n', '')
+                article['text'] = content_string  # Adds a new key-value, single string
+                content_array = []
     return articles
 
 
@@ -180,8 +199,10 @@ def remove_urls_from_text(article):
 
 # Standard regex for cleaning html tags
 def html_to_text(text):
-    clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
-    return str(re.sub(clean, '', text))
+    soup = BeautifulSoup(text, 'html.parser')
+    return soup.text
+    # clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    # return str(re.sub(clean, '', text))
 
 
 # Resize a set of images
@@ -428,12 +449,9 @@ def image_fetcher(start_index=0, batch_size=50, _max=None):
 
 
 if __name__ == '__main__':
-    # main(batch_size=100000)
+    main(batch_size=100, _max=1000)
     # extract_only_image_urls(batch_size=50000)
     # image_fetcher(batch_size=1000, start_index=0)
     # move_files(source='../HuJuData/data/processed/images/', destination='E:/images/')
     # move_files(source='E:/images/', destination='F:/imgs/', copy=True)
-    s = time.time()
-    resize_images()
-    e = time.time()
-    print('{:.3g} mins'.format(e-s))
+    # resize_images()
