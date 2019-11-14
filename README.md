@@ -1,5 +1,5 @@
 # Master thesis repo . . .
-## Will include
+## Contents
 * Scripts for processing TREC Washington Post Corpus (done/in-progress)
   * Script for cleaning dataset and converting to .csv format.
     * nan's for empty values, flattens nested json-structure, cleans html tags, ...
