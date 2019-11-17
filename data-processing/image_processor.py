@@ -10,8 +10,9 @@ import grequests
 import pandas as pd
 from PIL import Image
 
-import utils
+from .datautils import utils
 import json_lines as jl
+
 
 # Resize a set of images
 def resize_images(file_dir=None, batch_size=10):
@@ -107,7 +108,7 @@ def exists_in_log(id):
         return False
     count = 0
     for ids in df['id'].values:
-        if ids is id:
+        if ids == id:
             count += 1
     if count >= 1:
         return True

@@ -29,7 +29,7 @@ def options(path):
         choice = int(input())
     except ValueError:
         print('Must be digit')
-        options(path)
+        return options(path)
     if choice == 0:
         return path
     if choice == 1:

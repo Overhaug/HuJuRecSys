@@ -12,7 +12,7 @@ import pytz
 from bs4 import BeautifulSoup
 from json_lines import reader as jlreader
 
-import utils
+from .datautils import utils
 
 
 def main(path, _max=None, batch_size=5000, save_loc='TWPC_cleaned.csv'):
