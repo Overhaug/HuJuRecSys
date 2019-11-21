@@ -141,6 +141,6 @@ def save_as_csv(data, path):
 
 if __name__ == '__main__':
     filterwarnings("ignore", category=UserWarning, module='bs4')  # Suppress userwarnings
-    main(batch_size=250000,
+    main(batch_size=100000,
          path='../../HuJuData/data/corpus/TWPC.jl',
          save_loc='D:/newsRecSys/data/corpus_csv.csv')

@@ -74,7 +74,6 @@ def overall_distribution(dates_df, years, save=False):
 
     plt.legend([year for year in years])
     plt.xticks(range(1, 13))
-    plt.yticks(range(0, 17000, 1000))
     plt.grid()
     plt.xlabel('Month')
     plt.ylabel('Articles')
@@ -84,16 +83,34 @@ def overall_distribution(dates_df, years, save=False):
     plt.close()
 
 
-def get_only_dates_df():
-    df = pd.read_csv('D:/newsRecSys/data/corpus_csv.csv').dropna()
-    return pd.to_datetime(df['published_date'], format='%Y-%m-%d', errors='coerce')
+def topic_distribution(data, save=False):
+    plt.figure(figsize=(12, 8))
+    plt.title("Topics")
+    topics = data.topic.unique()
+
+    for y in topics:
+        print(y)
+
+    # plt.legend([topic for topic in topics])
+    plt.show()
+    plt.close()
+
+
+def get_df(drop_nans=True, only_dates=False):
+    df = pd.read_csv('D:/newsRecSys/data/sample.csv')
+    if only_dates is True:
+        df = pd.to_datetime(df['published_date'], format='%Y-%m-%d', errors='coerce')
+    if drop_nans is True:
+        df.dropna()
+    return df
 
 
 if __name__ == '__main__':
-    dates = get_only_dates_df()
-    no_of_articles_per_month_for_a_year(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
-    no_of_articles_per_year_for_a_month(dates, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
-    no_of_articles_per_year(dates)
-    no_of_articles_per_month_all_years(dates)
+    dates = get_df(only_dates=True)
+    # no_of_articles_per_month_for_a_year(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
+    # no_of_articles_per_year_for_a_month(dates, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+    # no_of_articles_per_year(dates)
+    # no_of_articles_per_month_all_years(dates)
     overall_distribution(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
-    no_of_articles_per_day_overall(dates)
+    # no_of_articles_per_day_overall(dates)
+

@@ -10,3 +10,4 @@
 testing.py
 __pycache__/Utils.cpython-36.pyc
 .idea/dictionaries/Overh.xml
+*.pyc

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import os
+import pandas as pd
 
 # last-index-of
 def rindex(iterable, value):
@@ -40,5 +42,19 @@ def options(path):
                 new_path = path[:i-1] + str(new_no) + '.csv'
                 path = new_path
         except ValueError:
-            path = path[:i] + path[i:-4] + '2' + '.csv'
+            for n in range(2, 100):
+                if os.path.exists(path[:i] + path[i:-4] + str(n) + '.csv'):
+                    pass
+                else:
+                    path = path[:i] + path[i:-4] + str(n) + '.csv'
+                    break
         return path
+
+
+def find_nth(haystack, needle, n):
+    start = haystack.find(needle)
+    while start >= 0 and n > 1:
+        start = haystack.find(needle, start+len(needle))
+        n -= 1
+    return start
+
