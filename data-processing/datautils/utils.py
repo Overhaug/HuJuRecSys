@@ -40,5 +40,5 @@ def options(path):
                 new_path = path[:i-1] + str(new_no) + '.csv'
                 path = new_path
         except ValueError:
-            path = path[:i] + path[i:-4] + '1' + '.csv'
+            path = path[:i] + path[i:-4] + '2' + '.csv'
         return path

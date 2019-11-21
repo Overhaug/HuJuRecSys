@@ -4,7 +4,6 @@
 
 import re
 from datetime import datetime as dt
-from os.path import exists
 from warnings import filterwarnings
 
 import pandas as pd
@@ -12,15 +11,16 @@ import pytz
 from bs4 import BeautifulSoup
 from json_lines import reader as jlreader
 
-from .datautils import utils
+import os
+
+from datautils import utils
 
 
 def main(path, _max=None, batch_size=5000, save_loc='TWPC_cleaned.csv'):
-    if exists(save_loc):
+    if os.path.exists(save_loc):
         save_loc = utils.options(save_loc)
         print('New path: {}'.format(save_loc))
-    articles = []
-    num = 0
+    articles, num = [], 0
     _max = utils.file_len(path) - 1 if _max is None else _max
     with open(path, 'rb') as f:
         for article in jlreader(f):
@@ -133,11 +133,14 @@ def html_to_text(text):
 def save_as_csv(data, path):
     processed_data = stringify(data)
     df = pd.DataFrame(processed_data)
-    df.to_csv(path, sep=',', index=False, header=True, mode='w')
+    if os.path.exists(path):
+        df.to_csv(path, sep=',', index=False, header=False, mode='a')
+    else:
+        df.to_csv(path, sep=',', index=False, header=True, mode='w')
 
 
 if __name__ == '__main__':
     filterwarnings("ignore", category=UserWarning, module='bs4')  # Suppress userwarnings
-    main(batch_size=50000,
-         path='../HuJuData/data/corpus/TWPC.jl',
-         save_loc='../HuJuData/data/processed/corpus_csv.csv')
+    main(batch_size=250000,
+         path='../../HuJuData/data/corpus/TWPC.jl',
+         save_loc='D:/newsRecSys/data/corpus_csv.csv')

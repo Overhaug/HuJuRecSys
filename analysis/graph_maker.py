@@ -7,26 +7,28 @@ months = {
 }
 
 
-def no_of_articles_per_month_for_a_year(dates_df, year, save=False):
-    year_df = dates_df.loc[dates_df.dt.year == int(year)]
+def no_of_articles_per_month_for_a_year(dates_df, years, save=False):
+    for year in years:
+        year_df = dates_df.loc[dates_df.dt.year == int(year)]
 
-    year_df.groupby([year_df.dt.month]).count().plot(kind="bar")
-    plt.title("No. of news items per month for " + str(year))
-    if save is True:
-        plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_month_for_' + str(year) + '.pdf')
-    plt.show()
-    plt.close()
+        year_df.groupby([year_df.dt.month]).count().plot(kind="bar")
+        plt.title("No. of news items per month for " + str(year))
+        if save is True:
+            plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_month_for_' + str(year) + '.pdf')
+        plt.show()
+        plt.close()
 
 
-def no_of_articles_per_year_for_a_month(dates_df, month, save=False):
-    month_df = dates_df.loc[dates_df.dt.month == int(month)]
-    month_name = str(months[month])
-    month_df.groupby([month_df.dt.year]).count().plot(kind="bar")
-    plt.title("No. of news items per year for " + month_name)
-    if save is True:
-        plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_year_for_' + month_name + '.pdf')
-    plt.show()
-    plt.close()
+def no_of_articles_per_year_for_a_month(dates_df, a_months, save=False):
+    for month in a_months:
+        month_df = dates_df.loc[dates_df.dt.month == int(month)]
+        month_name = str(months[month])
+        month_df.groupby([month_df.dt.year]).count().plot(kind="bar")
+        plt.title("No. of news items per year for " + month_name)
+        if save is True:
+            plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_year_for_' + month_name + '.pdf')
+        plt.show()
+        plt.close()
 
 
 def no_of_articles_per_year(dates_df, save=False):
@@ -47,18 +49,51 @@ def no_of_articles_per_month_all_years(dates_df, save=False):
     plt.close()
 
 
-def get_dates_as_dt_df():
+def no_of_articles_per_day_overall(dates_df, save=False):
+    plt.figure(figsize=(12, 8))
+    for month in months:
+        month_df = dates_df.loc[dates_df.dt.month == int(month)]
+        month_df.groupby([month_df.dt.day]).count().plot(kind="line")
+    plt.title("Total no. of news items per day (2012-2017)")
+    plt.xticks(range(1, 32))
+    plt.xlabel('Day')
+    plt.ylabel('Articles')
+    plt.legend([month for month in months.values()])
+    if save is True:
+        plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_day_all_years' + '.pdf')
+    plt.show()
+    plt.close()
+
+
+def overall_distribution(dates_df, years, save=False):
+    plt.figure(figsize=(12, 8))
+    plt.title("Articles per month (2012-2017)")
+    for year in years:
+        year_df = dates_df.loc[dates_df.dt.year == int(year)]
+        year_df.groupby([year_df.dt.month]).count().plot(kind='line')
+
+    plt.legend([year for year in years])
+    plt.xticks(range(1, 13))
+    plt.yticks(range(0, 17000, 1000))
+    plt.grid()
+    plt.xlabel('Month')
+    plt.ylabel('Articles')
+    if save is True:
+        plt.savefig('D:/newsRecSys/data/figs/' + 'overall_distribution' + '.pdf')
+    plt.show()
+    plt.close()
+
+
+def get_only_dates_df():
     df = pd.read_csv('D:/newsRecSys/data/corpus_csv.csv').dropna()
     return pd.to_datetime(df['published_date'], format='%Y-%m-%d', errors='coerce')
 
 
 if __name__ == '__main__':
-    dates = get_dates_as_dt_df()
-    years = (2011, 2012, 2013, 2014, 2015, 2016, 2017)
-    for y in years:
-        no_of_articles_per_month_for_a_year(dates, y, save=True)
-    for m in months:
-        no_of_articles_per_year_for_a_month(dates, m, save=True)
-
-    no_of_articles_per_year(dates, save=True)
-    no_of_articles_per_month_all_years(dates, save=True)
+    dates = get_only_dates_df()
+    no_of_articles_per_month_for_a_year(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
+    no_of_articles_per_year_for_a_month(dates, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+    no_of_articles_per_year(dates)
+    no_of_articles_per_month_all_years(dates)
+    overall_distribution(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
+    no_of_articles_per_day_overall(dates)
