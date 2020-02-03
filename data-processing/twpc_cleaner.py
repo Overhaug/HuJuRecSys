@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # A script to clean and improve the TREC Washington Post Corpus for use in research. Creates a CSV file.
 
+import datetime
+import os
 import re
 from datetime import datetime as dt
 from warnings import filterwarnings
@@ -9,32 +11,31 @@ from warnings import filterwarnings
 import pandas as pd
 import pytz
 from bs4 import BeautifulSoup
+from datautils import categories as cats
+from datautils import utils
 from json_lines import reader as jlreader
 
-import os
 
-from datautils import utils
-
-
-def main(path, _max=None, batch_size=5000, save_loc='TWPC_cleaned.csv'):
+def main(path, batch_size=5000, save_loc='TWPC_cleaned.csv'):
     if os.path.exists(save_loc):
         save_loc = utils.options(save_loc)
         print('New path: {}'.format(save_loc))
     articles, num = [], 0
-    _max = utils.file_len(path) - 1 if _max is None else _max
+    _max = utils.file_len(path) - 1
     with open(path, 'rb') as f:
         for article in jlreader(f):
             if article is None:
                 continue
-            article = convert_unix_to_datetime(article)
-            article = get_image_url(article)
-            article = get_author_bio(article)
-            article = get_topic(article)
+            article['date'], article['time'] = convert_unix_to_datetime(article)
+            article['image_url'] = get_image_url(article)
+            article['author_bio'] = get_author_bio(article)
+            article['subcategory'] = get_subcategory(article)
+            article['category'] = get_category(article)
             if article['title'] is None or article['title'] == '':
-                # Some way to infer a title?
                 article['title'] = 'nan'
             if article['author'] is None or article['author'] == '':
-                article = get_author(article)
+                article['author'] = get_author(article)
+            if is_compilation(article):
                 article['subtype'] = 'compilation'
             else:
                 article['subtype'] = 'standalone'
@@ -50,62 +51,73 @@ def main(path, _max=None, batch_size=5000, save_loc='TWPC_cleaned.csv'):
                     return
 
 
-# Extracts topic from article kickers. They are usually in either of these formats: "Business", "Redskins/NFL"
-def get_topic(article):
+# Finds the appropriate main category group and returns this
+def get_category(article):
     for prop in article['contents']:
         if prop is not None and 'type' in prop and prop['type'] == 'kicker' \
                 and 'content' in prop and prop['content'] is not None:
-            article['topic'] = html_to_text(prop['content'])
-            return article
-    article['topic'] = 'nan'
-    return article
+            return html_to_text(cats.get_group(prop['content']))
+    return 'nan'
+
+
+def get_subcategory(article):
+    for prop in article['contents']:
+        if prop is not None and 'type' in prop and prop['type'] == 'kicker' \
+                and 'content' in prop and prop['content'] is not None:
+            return html_to_text(prop['content'])
+    return 'nan'
 
 
 # Gets author bio from content array
 def get_author_bio(article):
     for prop in article['contents']:
         if prop is not None and 'bio' in prop and prop['bio'] != '':
-            article['author_bio'] = html_to_text(prop['bio'])
-            return article
-    article['author_bio'] = 'nan'
-    return article
+            return html_to_text(prop['bio'])
+    return 'nan'
+
+
+def is_compilation(article):
+    for prop in article['contents']:
+        if prop is not None and 'content' in prop and str(prop['content']).__contains__('Compiled by'):
+            return prop
+    return False
 
 
 # Gets author if not present in article (typically if it's a compilation-type blog post)
 def get_author(article):
-    for prop in article['contents']:
-        if prop is not None and 'content' in prop and str(prop['content']).__contains__('Compiled by'):
-            clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
-            clean_text = str(re.sub(clean, '', prop['content'])).split()
-            i = utils.rindex(clean_text, 'by')
-            article['author'] = ' '.join(clean_text[i + 1:])
-            return article
-    article['author'] = 'nan'
-    return article
+    proceed = is_compilation(article)
+    if proceed:
+        clean = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+        clean_text = str(re.sub(clean, '', proceed['content'])).split()
+        i = utils.rindex(clean_text, 'by')
+        return ' '.join(clean_text[i + 1:])
+    return 'nan'
 
 
 # Fetches image URL on the current article.
 def get_image_url(article):
     for prop in article['contents']:
         if prop is not None and prop['type'] == 'image':
-            article['image_url'] = str(prop['imageURL']) if prop['imageURL'] != '' else 'nan'
-            return article
-    article['image_url'] = 'nan'
-    return article
+            return str(prop['imageURL']) if prop['imageURL'] != '' else 'nan'
+    return 'nan'
 
 
 # Convert unix dates to datetime string
 def convert_unix_to_datetime(item):
     try:
-        item['published_date'] = dt.utcfromtimestamp(item['published_date'] / 1000.0) \
+        item['date'] = dt.utcfromtimestamp(item['published_date'] / 1000.0) \
             .astimezone(pytz.timezone("America/New_York")) \
             .strftime('%Y-%m-%d')
+        item['time'] = dt.utcfromtimestamp(item['published_date'] / 1000.0) \
+            .astimezone(pytz.timezone("America/New_York")) \
+            .strftime('%H-%M-%S')
+        return item['date'], item['time']
     except TypeError:
         print('Unable to convert {}, id: {} '.format(item['published_date'], item['id']))
-        item['published_date'] = 'nan'
+        return 'nan', 'nan'
     except OSError:
         print('Invalid argument {}, id: {}'.format(item['published_date'], item['id']))
-    return item
+        return 'nan', 'nan'
 
 
 # Finds "content" strings within objects in an array and concatenates to a single string
@@ -132,7 +144,7 @@ def html_to_text(text):
 # Saves data as csv
 def save_as_csv(data, path):
     processed_data = stringify(data)
-    df = pd.DataFrame(processed_data)
+    df = pd.DataFrame(processed_data).dropna()
     if os.path.exists(path):
         df.to_csv(path, sep=',', index=False, header=False, mode='a')
     else:
@@ -141,6 +153,6 @@ def save_as_csv(data, path):
 
 if __name__ == '__main__':
     filterwarnings("ignore", category=UserWarning, module='bs4')  # Suppress userwarnings
-    main(batch_size=100000,
+    main(batch_size=300000,
          path='../../HuJuData/data/corpus/TWPC.jl',
-         save_loc='D:/newsRecSys/data/corpus_csv.csv')
+         save_loc='D:\\newsRecSys\\data\\corpus.csv')
