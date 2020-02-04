@@ -93,10 +93,10 @@ def no_of_articles_per_year(dates_df, save=False):
 
 
 def no_of_articles_per_month_all_years(dates_df, save=False):
-    dates_df.groupby([dates_df.dt.month]).count().plot(kind="line")
+    dates_df.groupby([dates_df.dt.month]).count().plot(kind="bar")
     plt.title("Total no. of news items per month (2012-2017)")
     if save is True:
-        plt.savefig('E:/figs/' + 'articles_per_month_all_years' + '.pdf')
+        plt.savefig('D:/newsRecSys/data/figs/' + 'articles_per_month_all_years' + '.pdf')
     plt.show()
     plt.close()
 
@@ -104,8 +104,8 @@ def no_of_articles_per_month_all_years(dates_df, save=False):
 def no_of_articles_per_day_overall(dates_df, save=False):
     plt.figure(figsize=(12, 8))
     for month in months:
-        month_df = dates_df.loc[dates_df.published_date.dt.month == int(month)]
-        month_df.groupby([month_df.published_date.dt.day]).count().plot(kind="line")
+        month_df = dates_df.loc[dates_df.dt.month == int(month)]
+        month_df.groupby([month_df.dt.day]).count().plot(kind="line")
     plt.title("Total no. of news items per day (2012-2017)")
     plt.xticks(range(1, 32))
     plt.xlabel('Day')
@@ -121,8 +121,8 @@ def overall_distribution(dates_df, years, save=False):
     plt.figure(figsize=(12, 8))
     plt.title("Articles per month (2012-2017)")
     for year in years:
-        year_df = dates_df.loc[dates_df['published_date'].dt.year == int(year)]
-        year_df.groupby([year_df['published_date'].dt.month]).count().plot(kind='line')
+        year_df = dates_df.loc[dates_df.dt.year == int(year)]
+        year_df.groupby([year_df.dt.month]).count().plot(kind='line')
 
     plt.legend([year for year in years])
     plt.xticks(range(1, 13))
@@ -346,6 +346,63 @@ def avg_article_length_per_month_across_all_years(data):
 
 
 
+def save_as_csv(data, save_loc):
+    data.to_csv(save_loc, sep=',', index=False, header=True, mode='w')
+
+
+def get_first_monday(dates):
+    for i, day in dates.iterrows():
+        date = str(str(day['year']) + '-' + str(day['month']) + '-' + str(day['day']))
+        d = datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
+        dayname = calendar.day_name[d]
+        if dayname == 'Monday':
+            return int(day['day'])
+
+
+def tf_idf(data):
+    pol = data.loc[data['category'] == 'Politics']
+    tfidfs = pd.DataFrame()
+
+    stemmer = SnowballStemmer("english")
+    stop = stopwords.words("english")
+
+    for y in (2012, 2013, 2014, 2015, 2016, 2017):
+        d = pol.loc[pol['published_date'].dt.year == y]
+        #print(len(d), y)
+
+        idfc = len(d) / len(d[d['text'].str.lower().apply(lambda x: 'election' in x)])
+
+        d['split_text'] = d['text'].str.split()
+
+        d['stemmed'] = d['split_text'].apply(lambda x: [stemmer.stem(j) for j in x])
+        d['stemmed_rStopwords'] = d['stemmed'].apply(lambda x: ' '.join([word for word in x if word not in stop]))
+        #print(len(t), y)
+
+        #print(len(d) / len(t), 'idf', '\n')
+
+        tfidf = []
+        for i, row in d.iterrows():
+            text = str(row['stemmed_rStopwords']).lower()
+            tc = text.count('elect') / len(text.split())
+            # most = []
+            # for t in text.split():
+            #     tcc = text.split().count(t) / len(text.split())
+            #     most.append((t, tcc))
+            try:
+                tfidf.append(tc * idfc)
+            except ZeroDivisionError:
+                pass
+        avg_tfidf = sum(tfidf) / len(tfidf)
+        tfidfs = pd.concat([tfidfs, pd.DataFrame({'year': y, 'tf-idf': [avg_tfidf]})])
+        print("{:.2%}".format(avg_tfidf), avg_tfidf)
+
+    tfidfs.plot()
+    plt.show()
+
+
+
+
+
 if __name__ == '__main__':
     mainfile = 'D:\\newsRecSys\\data\\corpus2.csv'
     f = get_df(source=mainfile)
@@ -354,7 +411,7 @@ if __name__ == '__main__':
     # no_of_articles_per_year_for_a_month(dates, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
     # no_of_articles_per_year(dates)
     # no_of_articles_per_month_all_years(dates)
-    # overall_distribution(f, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
+    overall_distribution(dates, (2011, 2012, 2013, 2014, 2015, 2016, 2017))
     # no_of_articles_per_day_overall(dates)
     # top_cat_month()
     # topic_distribution(df=True, save=True)
