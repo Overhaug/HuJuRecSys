@@ -7,11 +7,11 @@ import sys
 import time
 
 import grequests
+import json_lines as jl
 import pandas as pd
 from PIL import Image
 
-from .datautils import utils
-import json_lines as jl
+from ..utils import file_len
 
 
 # Resize a set of images
@@ -46,7 +46,6 @@ def resize_images(file_dir=None, batch_size=10):
             im.save(new + filenames[index], get_image_extension(filenames[index])[1:])
         except IOError:
             print('Could not resize {}'.format(img))
-            # validate_image(img)
     resize_images(file_dir=[x for x in file_dir if x not in filenames])
 
 
@@ -68,47 +67,33 @@ def get_image_extension(string):
     return string[i:].upper()
 
 
-# Uses Pillow's Verify to check if an image is valid
-def validate_image(image):
-    file_name = image[image.rfind('/'):]
-    try:
-        if get_image_extension(image).upper() is '.PNG':
-            im = Image.open(Image.composite(image, Image.new('RGB', image.size, 'white'), image))
-        else:
-            im = Image.open(image)
-        im.verify()
-    except (IOError, OSError):
-        print('Image {} could not be validated and will be removed'.format(file_name))
-        os.remove(image)
-
-
-def log_failed_requests(id, url, status_code):
-    if isinstance(id, list):
+def log_failed_requests(this_id, url, status_code):
+    if isinstance(this_id, list):
         entities = {
             'id': [],
             'url': [],
             'status_code': []
         }
-        for x in range(len(id)):
-            entities['id'].append(id[x])
+        for x in range(len(this_id)):
+            entities['id'].append(this_id[x])
             url_string = url[x] if str(url[x]).startswith('http') else 'nan'
             str(url_string).replace(',', '')
             entities['url'].append(url_string)
             entities['status_code'].append(status_code[x])
         save_as_csv(data=entities, path='requests_log.csv')
     else:
-        save_as_csv(data={'id': [id], 'url': [url], 'status_code': [status_code]},
+        save_as_csv(data={'id': [this_id], 'url': [url], 'status_code': [status_code]},
                     path='requests_log.csv')
 
 
-def exists_in_log(id):
+def exists_in_log(this_id):
     try:
         df = pd.read_csv('requests_log.csv')
     except OSError:
         return False
     count = 0
     for ids in df['id'].values:
-        if ids == id:
+        if ids == this_id:
             count += 1
     if count >= 1:
         return True
@@ -127,16 +112,16 @@ def save_as_csv(data, path):
 # Downloads images from a given list of urls
 # Filenames equate to article ID + enumerated suffix
 class ImageFetcher:
-    def __init__(self, ids, url, incompleteURL=None, incompleteID=None):
+    def __init__(self, ids, url, incomplete_urls=None, incomplete_ids=None):
         self.incompleteID = None
         self.incompleteURL = None
         self.status_codes = []
-        if incompleteID is None:
+        if incomplete_ids is None:
             self.ids = [x for x in ids]
             self.urls = [x for x in url]
         else:
-            self.ids = [x for x in incompleteID]
-            self.urls = [x for x in incompleteURL]
+            self.ids = [x for x in incomplete_ids]
+            self.urls = [x for x in incomplete_urls]
 
     def add_failed_requests(self, ids, urls, exception):
         if self.incompleteID is None:
@@ -241,7 +226,7 @@ def get_images(filepath, incomplete_urls=None,
 
 def image_fetcher(source, save_loc=os.curdir, start_index=0, batch_size=50, _max=None, max_retries=1):
     const_start = start_index
-    _max = int(const_start + _max) if _max is not None else utils.file_len(source)
+    _max = int(const_start + _max) if _max is not None else file_len(source)
     start_of_process = time.time()
     total = 0
     while True:
@@ -283,7 +268,7 @@ def get_image_url(articles):
 def extract_image_urls(source, save_loc='image_urls.csv', batch_size=20000):
     articles = []
     num = 0
-    _max = utils.file_len(source)
+    _max = file_len(source)
     print(_max)
     with open(source, 'rb') as file_reader:
         for article in jl.reader(file_reader):
@@ -300,7 +285,7 @@ def extract_image_urls(source, save_loc='image_urls.csv', batch_size=20000):
 
 
 if __name__ == '__main__':
-    #image_fetcher(batch_size=10, start_index=10, max_retries=1,
+    # image_fetcher(batch_size=10, start_index=10, max_retries=1,
     #              source='../HuJuData/data/processed/image_urls.csv',
     #              save_loc='../HuJuData/data/processed/images/')
 

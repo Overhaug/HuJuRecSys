@@ -1,12 +1,11 @@
 import calendar
 import datetime
 
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from nltk.stem.snowball import SnowballStemmer
-from nltk.corpus import stopwords
+
 from twpc.utils import get_df
 
 pd.set_option('display.max_colwidth', -1)
@@ -360,38 +359,6 @@ def avg_article_length_per_month_all_years(data):
     return df
 
 
-def tf_idf(data):
-    pol = data.loc[data['category'] == 'Politics']
-    tfidfs = pd.DataFrame()
-
-    stemmer = SnowballStemmer("english")
-    stop = stopwords.words("english")
-
-    for y in (2012, 2013, 2014, 2015, 2016, 2017):
-        d = pol.loc[pol['published_date'].dt.year == y]
-
-        idfc = len(d) / len(d[d['text'].str.lower().apply(lambda x: 'election' in x)])
-
-        d['split_text'] = d['text'].str.split()
-        d['stemmed'] = d['split_text'].apply(lambda x: [stemmer.stem(j) for j in x])
-        d['stemmed_rStopwords'] = d['stemmed'].apply(lambda x: ' '.join([word for word in x if word not in stop]))
-
-        tfidf = []
-        for i, row in d.iterrows():
-            text = str(row['stemmed_rStopwords']).lower()
-            tc = text.count('elect') / len(text.split())
-            try:
-                tfidf.append(tc * idfc)
-            except ZeroDivisionError:
-                pass
-        avg_tfidf = sum(tfidf) / len(tfidf)
-        tfidfs = pd.concat([tfidfs, pd.DataFrame({'year': y, 'tf-idf': [avg_tfidf]})])
-        print("{:.2%}".format(avg_tfidf), avg_tfidf)
-
-    tfidfs.plot()
-    plt.show()
-
-
 def time_of_day(title, df):
     f = pd.DataFrame()
     for year in years_int:
@@ -429,7 +396,7 @@ def time_of_day(title, df):
 
 
 def simple_dist_graph(title, topic=None):
-    f = get_df(source=mainfile, dt=True, topic=topic)
+    f = get_df(source=mainfile, drop_nans=True, topic=topic)
     l = []
     for y in years_int:
         df = f.loc[f.date.dt.year == y]
@@ -455,12 +422,10 @@ if __name__ == '__main__':
     politics = 'E:\\data\\politics_distribution.csv'
     l_politics = 'E:\\data\\avglength_politics.csv'
     sample = 'E:\\data\\stratified_sample.csv'
-    f = get_df(source=mainfile, topic="Politics")
     # f = get_df(source=mainfile, dt=True, topic='Politics')
     years = ["2012", "2013", "2014", "2015", "2016", "2017", "all years"]
     years_int = [2012, 2013, 2014, 2015, 2016, 2017]
     d = pd.DataFrame()
-    d['len'] = f['author_bio'].str.split()
     print(d)
     # time_of_day("No. articles published over 24-hours sample", f)
     # topic_distribution_stacked_all(save=True)

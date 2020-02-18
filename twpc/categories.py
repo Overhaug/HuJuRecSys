@@ -11,7 +11,6 @@ categories = {
         "Polling",
         "Congress",
         "White House",
-        "Maryland Politics",
         "Right Turn",
         "GovBeat",
         "In the Loop",
@@ -24,13 +23,15 @@ categories = {
         "World Politics",
         "Wonkblog",
         "Post Politics",
-        "The Insider",
         "Think Tanked",
         "PowerPost",
-        "Post Politics Live"
+        "Post Politics Live",
+        "Washington Post Live",
+        "Post Live",
     ],
     "Opinions": [
         "Opinions",
+        "Opinion",
         "The Post's View",
         "Act Four",
         "Global Opinions",
@@ -82,6 +83,7 @@ categories = {
         "Asia & Pacific",
     ],
     "D.C., Md. & Va.": [  # Local news
+        "Maryland Politics",
         "D.C., Md. & Va",
         "The District",
         "Maryland",
@@ -102,8 +104,9 @@ categories = {
         "Restaurants",
         "On Faith Local",
         "Maryland Terrapins",
-        "District of Debonis",
+        "District of DeBonis",
         "A House Divided",
+        "Local",
 
     ],
     "Sports": [
@@ -114,7 +117,7 @@ categories = {
         "NHL",
         "Boxing & MMA",
         "College Sports",
-        "D.C. Sports Bog"
+        "D.C. Sports Bog",
         "Fantasy Sports",
         "Golf",
         "High School Sports",
@@ -136,6 +139,7 @@ categories = {
         "Washington Wizards",
         "Soccer Insider",
         "London 2012 Olympics",
+        "The Insider",
     ],
     "Arts & Entertainment": [
         "Arts & Entertainment",
@@ -200,7 +204,7 @@ categories = {
     ],
     "Holiday Guide": [
         "Holiday Gift Guide",
-        "Holiday Guide 2012"
+        "Holiday Guide 2012",
     ],
     "Immigration": [
         "Immigration",
@@ -259,13 +263,11 @@ categories = {
         "Top News",
         "Business",
         "Entertainment",
-        "Local",
         "National",
         "Opinions",
         "Politics",
         "Sports",
         "Technology",
-        "World",
         "Digger",
     ],
     "Puzzles & Games": [
@@ -311,9 +313,6 @@ categories = {
     "The Lily": [
         "The Lily",
     ],
-    "Washington Post Live": [
-        "Washington Post Live",
-    ],
     "Discussions": [
         "Discussions",
     ],
@@ -348,7 +347,8 @@ categories = {
         "Morning Mix",
     ],
     "PR": [
-        "WashPost PR Blog"
+        "WashPost PR Blog",
+        "PR"
     ],
     "America Answers": [
         "America Answers",
@@ -359,6 +359,7 @@ categories = {
     "Test": [
         "Test",
         "Test ",
+        "test ",
     ],
     "Storyline": [  # Various categories
         "Storyline",
@@ -381,10 +382,9 @@ categories = {
 
 
 def get_group(c):
-    for cat in categories:
-        if str(c.lower()) in str(categories[cat]).lower():
-            return cat
-    # raise ValueError(f"Category {c} is not mapped")
+    for k, v in categories.items():
+        if c in v:
+            return k
     print(f"Category {c} is not mapped. Setting default category instead.")
     return c
 

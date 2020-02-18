@@ -1,14 +1,10 @@
-import pandas as pd
 from datetime import timedelta, date
 
+import pandas as pd
+
+from utils import get_df, get_id_path_pairs
+
 years = (2012, 2013, 2014, 2015, 2016, 2017)
-
-
-def df_with_dt(f):
-    df = pd.read_csv(f).dropna()
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
-    df['time'] = pd.to_datetime(df['time'], format='%H-%M-%S', errors='coerce')
-    return df
 
 
 def sample_frac_per_day(df, frac=10):
@@ -35,20 +31,25 @@ def sample_frac_per_day(df, frac=10):
     save_as_csv(new_df, 'D:/newsRecSys/data/sample.csv')
 
 
-def sample_stratified_per_year(df, s, n, topic=None):
+def sample_stratified_per_year(df, s, n):
+    print(f"Sampling {n} articles per year in {years}'")
     final = pd.DataFrame()
-    if topic is not None:
-        df = df.loc[df.category == topic]
+    file_paths = get_id_path_pairs(df, save_path="E:\\data\\id_path.csv")
+    file_paths = list(file_paths.keys())
     for y in years:
-        sample = df.loc[df.date.dt.year == y].sample(n)
+        y_df = df.loc[df.date.dt.year == y]
+        y_df = y_df[y_df.id.isin(file_paths)]
+        sample = y_df.sample(n)
         final = pd.concat([final, sample])
     save_as_csv(final, s)
+    print(f"Saved {len(final)} articles to {s}")
 
 
-def save_as_csv(data, path):
-    data.to_csv(path, sep=',', index=False, header=True, mode='w')
+def save_as_csv(df, path):
+    df.to_csv(path, sep=',', index=False, header=True, mode='w')
 
 
-mainfile = 'E:\\data\\corpus_wo_breaklines.csv'
-data = df_with_dt(mainfile)
-sample_stratified_per_year(data, 'E:\\data\\stratified_sample.csv', n=340)
+if __name__ == '__main__':
+    main_file = 'E:\\data\\twp_corpus.csv'
+    data = get_df(main_file, drop_nans=True, topic="Politics")
+    sample_stratified_per_year(data, 'E:\\data\\stratified_politics_sample.csv', n=400)
