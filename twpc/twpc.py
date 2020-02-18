@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # A script to clean and improve the TREC Washington Post Corpus for use in research. Creates a CSV file.
 
-import datetime
 import os
 import re
 from datetime import datetime as dt
@@ -11,7 +10,7 @@ from warnings import filterwarnings
 import pandas as pd
 import pytz
 from bs4 import BeautifulSoup
-from datautils import categories as cats
+from . import categories
 from datautils import utils
 from json_lines import reader as jlreader
 
@@ -26,11 +25,10 @@ def main(path, batch_size=5000, save_loc='TWPC_cleaned.csv'):
         for article in jlreader(f):
             if article is None:
                 continue
-            article['date'], article['time'] = convert_unix_to_datetime(article)
+            article['date'], article['time'] = convert_unix_to_date_time(article)
             article['image_url'] = get_image_url(article)
             article['author_bio'] = get_author_bio(article)
-            article['subcategory'] = get_subcategory(article)
-            article['category'] = get_category(article)
+            article['category'], article['subcategory'] = get_categories(article)
             if article['title'] is None or article['title'] == '':
                 article['title'] = 'nan'
             if article['author'] is None or article['author'] == '':
@@ -52,20 +50,12 @@ def main(path, batch_size=5000, save_loc='TWPC_cleaned.csv'):
 
 
 # Finds the appropriate main category group and returns this
-def get_category(article):
+def get_categories(article):
     for prop in article['contents']:
         if prop is not None and 'type' in prop and prop['type'] == 'kicker' \
                 and 'content' in prop and prop['content'] is not None:
-            return html_to_text(cats.get_group(prop['content']))
-    return 'nan'
-
-
-def get_subcategory(article):
-    for prop in article['contents']:
-        if prop is not None and 'type' in prop and prop['type'] == 'kicker' \
-                and 'content' in prop and prop['content'] is not None:
-            return html_to_text(prop['content'])
-    return 'nan'
+            return categories.get_group(prop['content']), html_to_text(prop['content'])
+    return 'nan', 'nan'
 
 
 # Gets author bio from content array
@@ -103,7 +93,7 @@ def get_image_url(article):
 
 
 # Convert unix dates to datetime string
-def convert_unix_to_datetime(item):
+def convert_unix_to_date_time(item):
     try:
         item['date'] = dt.utcfromtimestamp(item['published_date'] / 1000.0) \
             .astimezone(pytz.timezone("America/New_York")) \
@@ -111,6 +101,7 @@ def convert_unix_to_datetime(item):
         item['time'] = dt.utcfromtimestamp(item['published_date'] / 1000.0) \
             .astimezone(pytz.timezone("America/New_York")) \
             .strftime('%H-%M-%S')
+        del item['published_date']
         return item['date'], item['time']
     except TypeError:
         print('Unable to convert {}, id: {} '.format(item['published_date'], item['id']))
@@ -143,7 +134,7 @@ def html_to_text(text):
 
 # Saves data as csv
 def save_as_csv(data, path):
-    processed_data = stringify(data)
+    processed_data = stringify(data, breaklines=False)
     df = pd.DataFrame(processed_data).dropna()
     if os.path.exists(path):
         df.to_csv(path, sep=',', index=False, header=False, mode='a')
@@ -154,5 +145,5 @@ def save_as_csv(data, path):
 if __name__ == '__main__':
     filterwarnings("ignore", category=UserWarning, module='bs4')  # Suppress userwarnings
     main(batch_size=300000,
-         path='../../HuJuData/data/corpus/TWPC.jl',
-         save_loc='D:\\newsRecSys\\data\\corpus.csv')
+         path='E:\\data\\TWPC.jl',
+         save_loc='E:\\data\\corpus_wo_breaklines.csv')

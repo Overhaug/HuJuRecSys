@@ -1,7 +1,5 @@
 # A category mapping module
 
-from collections import defaultdict
-
 categories = {
     "Politics": [
         "Politics",
