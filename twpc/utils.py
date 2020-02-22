@@ -31,7 +31,7 @@ def file_len(fname, encoding='utf-8'):
 # Options menu when filepath exists
 #
 def options(path):
-    alternatives = ('Overwrite', 'Generate new path (current path: '+path+')')
+    alternatives = ('Overwrite', 'Generate new path (current path: ' + path + ')')
     for i, v in enumerate(alternatives):
         print(i, v)
     try:
@@ -44,9 +44,9 @@ def options(path):
     if choice == 1:
         i = path.rfind('.')
         try:
-            if int(path[i-1]):
-                new_no = int(path[i-1]) + 1
-                new_path = path[:i-1] + str(new_no) + '.csv'
+            if int(path[i - 1]):
+                new_no = int(path[i - 1]) + 1
+                new_path = path[:i - 1] + str(new_no) + '.csv'
                 path = new_path
         except ValueError:
             for n in range(2, 100):
@@ -61,7 +61,7 @@ def options(path):
 def find_nth(haystack, needle, n):
     start = haystack.find(needle)
     while start >= 0 and n > 1:
-        start = haystack.find(needle, start+len(needle))
+        start = haystack.find(needle, start + len(needle))
         n -= 1
     return start
 
@@ -81,47 +81,77 @@ def flattened_list_of_paths(basedir="E:/images/sorted/"):
     return one_dim
 
 
-def get_df(source, drop_nans, dt=True, topic=None):
+def get_df(source, drop_nans, dt=True, topic=None, article_type=None):
     df = pd.read_csv(source)
     if drop_nans is True:
         df = df.dropna()
+    if article_type is not None:
+        print(f"Locating articles of type {article_type}")
+        df = df.loc[df.type == article_type]
     if topic is not None:
-        print(f"Locating all articles within category {topic}")
+        print(f"Locating articles within category {topic}")
         df = df.loc[df.category == topic]
     if dt is True:
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
-        try:
-            df['time'] = df['time'].apply(lambda x: datetime.strptime(x, "%H-%M-%S").time())
-        except ValueError:
-            df['time'] = pd.to_datetime(df['time'].apply(lambda x: x[x.rfind(" ")+1:]), format="%H:%M:%S")
+        def to_datetime(this_df):
+            this_df['date'] = pd.to_datetime(this_df['date'], format='%Y-%m-%d', errors='coerce')
+            try:
+                this_df['time'] = pd.to_datetime(this_df['time'].apply(lambda x: x[x.rfind(" ") + 1:]),
+                                                 format="%H:%M:%S")
+                return this_df
+            except (ValueError, TypeError):
+                this_df['time'] = this_df['time'].apply(lambda x: datetime.strptime(x, "%H:%M:%S").time())
+                return this_df
+            except AttributeError:
+                print('Current DataFrame contains rows with invalid time values! '
+                      'Dropping these rows and attempting to convert again')
+                this_df = this_df[this_df['time'].notna()]
+                return to_datetime(this_df)
+
+        df = to_datetime(df)
     return df
 
 
-# Only used after creating a sample from the main dataset. See sampler.py
-# Takes a Dataframe as an argument, and uses each article's ID to find the appropriate (main) image.
-def get_id_path_pairs(df, save_path=None, path="E:/images/sorted/"):
+# returns: paths to images found by ids in df
+# If from_Path is set to either drive or subdir, returns a one-level dict with id-path pairs for only the main images,
+# else returns a multi-level dict with paths from sub directory and from drive.
+def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted/"):
+    allowable_path_args = ('drive', 'subdir')
+    if from_path is not None and from_path not in allowable_path_args:
+        raise ValueError(f"Bad argument {from_path}! Must be one of {allowable_path_args}")
     file_paths = flattened_list_of_paths(basedir=path)
     article_ids = df.id.tolist()
-    id_path = {}
-    filtered_id_path = {}
-    # Creates a dictionary (id_path) of all images available,
-    # where key is an image's ID and value is the path to the image
-    for file in file_paths:
-        cfile = file[file.rfind("\\") + 1:file.rfind(".") - 2]
-        if cfile in id_path.keys():
-            id_path[cfile].append(file)
+    id_paths = {}
+    for file_path in file_paths:
+        base_id = file_path[file_path.rfind("\\") + 1:file_path.rfind("-")]
+        file_id = file_path[file_path.rfind("\\") + 1:file_path.rfind(".")]
+        from_base = file_path[file_path.rfind("/") + 1:]
+        if base_id in id_paths.keys():
+            id_paths[base_id].update({  # Updates existing dictionary
+                file_id: {
+                    'drive': file_path,
+                    'subdir': from_base
+                }})
         else:
-            id_path[cfile] = [file]
+            id_paths[base_id] = {  # Creates a dictionary with id as key
+                file_id: {
+                    'drive': file_path,
+                    'subdir': from_base
+                }}
 
-    # Results in a dict where key = relevant article ID, value = path to the relevant article ID
-    for article_id in article_ids:
-        try:
-            for path in id_path[article_id]:
-                if path[path.rfind("-") + 1:path.rfind("-") + 2] == "0":
-                    filtered_id_path[article_id] = path
-        except KeyError:
-            pass
+    filtered_id_path = {}
+    if from_path is not None:
+        n = 0
+        for article_id in article_ids:
+            try:
+                p = id_paths[article_id][article_id + "-0"]
+                filtered_id_path[article_id] = p[from_path]
+            except KeyError:
+                n += 1
+        print(f"{n} articles have no main image!")
+    else:
+        return filtered_id_path
+    # Saving only works having passed a from_Path argument
     if save_path is not None:
-        pd.DataFrame({'id': list(filtered_id_path.keys()), 'path': list(filtered_id_path.values())})\
+        pd.DataFrame({'id': list(filtered_id_path.keys()), 'path': list(filtered_id_path.values())}) \
             .to_csv(save_path)
     return filtered_id_path

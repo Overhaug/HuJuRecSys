@@ -12,6 +12,7 @@ from twpc import utils
 main_file = 'E:\\data\\corpus_wo_breaklines.csv'
 politics_file = 'E:\\data\\stratified_politics_sample.csv'
 
+
 # Implement all Similarity functions, which are:
 # TODO: TITLE - Levenshtein Distance, Jaro-Winkler distance, Longest common subsequence, Bi-gram, LDA
 # TODO: TEXT - TFIDF (DONE), BM25(?), LDA(?)

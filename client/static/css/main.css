@@ -1,0 +1,17 @@
+.item {
+    width: 400px;
+    float: left;
+    margin: 0 50px 0 50px;
+}
+
+.item img, .item iframe {
+    width: 400px;
+}
+
+.caption, .date, .author, .author_bio {
+    font-size: 12px;
+}
+
+.body {
+    font-size: 14px;
+}

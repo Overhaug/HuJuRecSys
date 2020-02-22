@@ -17,8 +17,8 @@ months = {
 }
 
 
-def year_month_day_distribution(df, years, title):
-    month_year = get_month_in_year(df, years)
+def year_month_day_distribution(df, title):
+    month_year = get_month_in_year(df)
     width = [3] * len(months)
     height = [2] * len(years)
 
@@ -59,17 +59,17 @@ def year_month_day_distribution(df, years, title):
     plt.show()
 
 
-def get_month_in_year(dates_df, years):
+def get_month_in_year(dates_df):
     month_year_df = []
     for year in years:
         year_df = dates_df.loc[dates_df.date.dt.year == int(year)]
         for m in year_df.date.dt.month.unique():
             month_df = year_df.loc[year_df.date.dt.month == m]
             current_month = pd.DataFrame()
-            for d in month_df.date.dt.day.unique():
-                c = len(month_df.loc[month_df.date.dt.day == d])
+            for day in month_df.date.dt.day.unique():
+                c = len(month_df.loc[month_df.date.dt.day == day])
                 current_month = pd.concat(
-                    [current_month, pd.DataFrame({'year': [year], 'month': [m], 'day': [d], 'counts': [c]})]
+                    [current_month, pd.DataFrame({'year': [year], 'month': [m], 'day': [day], 'counts': [c]})]
                 )
             current_month.sort_values(by=['month', 'day'], inplace=True)
             month_year_df.append(current_month)
@@ -122,7 +122,7 @@ def no_of_articles_per_day_overall(dates_df, save=False):
     plt.close()
 
 
-def overall_distribution(dates_df, years, save=False):
+def overall_distribution(dates_df, save=False):
     plt.figure(figsize=(12, 8))
     plt.title("Articles per month (2012-2017)")
     for year in years:
@@ -142,7 +142,7 @@ def overall_distribution(dates_df, years, save=False):
 
 def top_cat_month():
     plt.figure(figsize=(12, 8))
-    f = get_df(source='D:\\newsRecSys\\data\\corpus_csv2.csv', dt=True)
+    f = get_df(source='D:\\newsRecSys\\data\\corpus_csv2.csv', drop_nans=True)
     df = pd.DataFrame()
     for m in months:
         x = f.loc[f['published_date'].dt.month == int(m)]
@@ -269,12 +269,12 @@ def top_n_topics(distribution, n=10):
     return distribution.tail(n)
 
 
-def subtype(d):
+def subtype(data):
     types = ('standalone', 'compilation')
 
     df = pd.DataFrame()
     for t in types:
-        t_df = d.loc[d.subtype == t]
+        t_df = data.loc[data.subtype == t]
         df = pd.concat([df, pd.DataFrame({'subtype': [t], 'size': [len(t_df)]})])
 
     print(df)
@@ -287,8 +287,8 @@ def save_as_csv(data, save_loc):
 def get_first_monday(dates):
     for i, day in dates.iterrows():
         date = str(str(day['year']) + '-' + str(day['month']) + '-' + str(day['day']))
-        d = datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
-        dayname = calendar.day_name[d]
+        a_day = datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
+        dayname = calendar.day_name[a_day]
         if dayname == 'Monday':
             return int(day['day'])
 
@@ -397,14 +397,14 @@ def time_of_day(title, df):
 
 def simple_dist_graph(title, topic=None):
     f = get_df(source=mainfile, drop_nans=True, topic=topic)
-    l = []
+    nums = []
     for y in years_int:
         df = f.loc[f.date.dt.year == y]
-        l.append(len(df))
+        nums.append(len(df))
 
     fig, axes = plt.subplots()
     x = np.arange(2012, 2018)
-    axes.bar(x, l, color='darkorange')
+    axes.bar(x, nums, color='darkorange')
     axes.grid(axis='y', linewidth=0.3)
     axes.set_yticks(np.arange(0, 28001, 4000))
     axes.set_ylabel("No. of articles")
@@ -414,7 +414,6 @@ def simple_dist_graph(title, topic=None):
     title = '_'.join(title.split())
     plt.savefig("E:\\figs\\" + title + '.png')
     plt.show()
-
 
 
 if __name__ == '__main__':

@@ -69,6 +69,7 @@ categories = {
         "The Intersect",
         "The Switch",
         "On I.T.",
+        "Technology",
     ],
     "World": [
         "World",
@@ -107,6 +108,7 @@ categories = {
         "District of DeBonis",
         "A House Divided",
         "Local",
+        "Digger",
 
     ],
     "Sports": [
@@ -155,7 +157,8 @@ categories = {
         "Celebrities",
         "Book Club",
         "Fall TV Preview",
-        ""
+        "Entertainment",
+        "Video"
     ],
     "Business": [
         "Business",
@@ -176,8 +179,8 @@ categories = {
         "World Business",
     ],
     "Personal Finance": [
-      "Personal Finance",
-      "Get There",
+        "Personal Finance",
+        "Get There",
     ],
     "Education": [
         "Education",
@@ -258,18 +261,6 @@ categories = {
         "In Sight",
         "Your Photos",
     ],
-    "Video": [
-        "Video",
-        "Top News",
-        "Business",
-        "Entertainment",
-        "National",
-        "Opinions",
-        "Politics",
-        "Sports",
-        "Technology",
-        "Digger",
-    ],
     "Puzzles & Games": [
         "Puzzles & Games",
         "Comics",
@@ -294,7 +285,7 @@ categories = {
         "On Giving",
     ],
     "Obituaries": [
-      "Obituaries",
+        "Obituaries",
     ],
     "Transportation": [
         "Transportation",

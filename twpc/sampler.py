@@ -34,7 +34,7 @@ def sample_frac_per_day(df, frac=10):
 def sample_stratified_per_year(df, s, n):
     print(f"Sampling {n} articles per year in {years}'")
     final = pd.DataFrame()
-    file_paths = get_id_path_pairs(df, save_path="E:\\data\\id_path.csv")
+    file_paths = get_id_path_pairs(df, save_path="E:\\data\\id_path.csv", from_path="drive")
     file_paths = list(file_paths.keys())
     for y in years:
         y_df = df.loc[df.date.dt.year == y]
@@ -50,6 +50,6 @@ def save_as_csv(df, path):
 
 
 if __name__ == '__main__':
-    main_file = 'E:\\data\\twp_corpus.csv'
+    main_file = 'E:\\data\\twp_corpus_html.csv'
     data = get_df(main_file, drop_nans=True, topic="Politics")
-    sample_stratified_per_year(data, 'E:\\data\\stratified_politics_sample.csv', n=400)
+    sample_stratified_per_year(data, 'E:\\data\\stratified_politics_sample_html.csv', n=400)
