@@ -10,7 +10,7 @@ from multiprocessing import Pool
 import numpy as np
 from PIL import Image
 
-from twpc.utils import flattened_list_of_paths
+from twpc.utils import all_image_paths
 
 
 def verify_one(f):
@@ -27,7 +27,7 @@ def verify_one(f):
 def mp_verify_images():
     p = Pool(processes=6)
 
-    files = flattened_list_of_paths()
+    files = all_image_paths()
 
     print(f"Files to be checked: {len(files)}")
 
@@ -63,7 +63,7 @@ class VerifyThread(threading.Thread):
 
 # Verify images using multithreading
 def mt_verify_images():
-    files = flattened_list_of_paths()
+    files = all_image_paths()
     n = 0
     threads = np.arange(1, 7, 1)
     thread_count = max(threads)
@@ -77,7 +77,7 @@ def mt_verify_images():
 
 # Singleprocessing
 def verify_images():
-    files = flattened_list_of_paths()
+    files = all_image_paths()
     for i, img in enumerate(files):
         try:
             im = Image.open(img)
@@ -88,6 +88,6 @@ def verify_images():
 
 # Alternative multithreading, by using ThreadPoolExecutor
 def mt_verify_images_executor(workers=int):
-    files = flattened_list_of_paths()
+    files = all_image_paths()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         executor.map(verify_one, files)

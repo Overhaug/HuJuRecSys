@@ -7,10 +7,28 @@
 </head>
 <body>
 {% autoescape false%}
-<div class="container">
-    {%for item in items%}
+<div class="container-first">
     <div class="item">
+        <span><strong>Main (focus) article</strong></span>
+        <h1 class="title">{{f_item['title']}}</h1>
+        <span>{{f_item.id}}</span>
+        <img class="main-image" src={{ url_for('download_file', filename=f_item['image']) }}>
+        <p class="caption">{{f_item['caption']}}</p>
+        <p class="date">Published: {{f_item['date_time']}}</p>
+        <p class="author">Author: {{f_item['author']}}</p>
+        <p class="author_bio">{{f_item['author_bio']}}</p>
+        <p class="body">{{f_item['text']}}</p>
+        <span class="link"><strong>Link to original article:</strong> {{f_item['link']}}</span>
+    </div>
+</div>
+{% endautoescape %}
+{% autoescape false%}
+<div class="container">
+    {%for item in n_items%}
+    <div class="item">
+        <span><strong>Related article</strong></span>
         <h1 class="title">{{item['title']}}</h1>
+        <span>{{item.id}}</span>
         <img class="main-image" src={{ url_for('download_file', filename=item['image']) }}>
         <p class="caption">{{item['caption']}}</p>
         <p class="date">Published: {{item['date_time']}}</p>

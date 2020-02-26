@@ -1,6 +1,8 @@
+#!/usr/bin/env python
 from datetime import timedelta, date
 
 import pandas as pd
+from bs4 import BeautifulSoup
 
 from utils import get_df, get_id_path_pairs
 
@@ -31,25 +33,38 @@ def sample_frac_per_day(df, frac=10):
     save_as_csv(new_df, 'D:/newsRecSys/data/sample.csv')
 
 
-def sample_stratified_per_year(df, s, n):
+def sample_stratified_per_year(df, s, n, both=False):
     print(f"Sampling {n} articles per year in {years}'")
     final = pd.DataFrame()
-    file_paths = get_id_path_pairs(df, save_path="E:\\data\\id_path.csv", from_path="drive")
+    file_paths = get_id_path_pairs(df, save_path="E:/data/id_path.csv", from_path="drive")
     file_paths = list(file_paths.keys())
     for y in years:
         y_df = df.loc[df.date.dt.year == y]
         y_df = y_df[y_df.id.isin(file_paths)]
         sample = y_df.sample(n)
         final = pd.concat([final, sample])
+
     save_as_csv(final, s)
     print(f"Saved {len(final)} articles to {s}")
+    if final['text'].str.contains("<br>").any():
+        final['image_caption'] = final['image_caption'].apply(lambda x: rm_html(x))
+        final['text'] = final['text'].apply(lambda x: rm_html(x))
+        final['author_bio'] = final['author_bio'].apply(lambda x: rm_html(x))
+        final['category'] = final['category'].apply(lambda x: rm_html(x))
+        new_path = s[:s.rfind(".")] + "_plain" + ".csv"
+        save_as_csv(final, new_path)
+        print(f"Saved {len(final)} articles without HTML tags to {new_path}")
 
 
 def save_as_csv(df, path):
     df.to_csv(path, sep=',', index=False, header=True, mode='w')
 
 
+def rm_html(text):
+    return BeautifulSoup(text, "html.parser").text
+
+
 if __name__ == '__main__':
-    main_file = 'E:\\data\\twp_corpus_html.csv'
-    data = get_df(main_file, drop_nans=True, topic="Politics")
-    sample_stratified_per_year(data, 'E:\\data\\stratified_politics_sample_html.csv', n=400)
+    main_file = 'E:/data/twp_corpus_html.csv'
+    data = get_df(main_file, drop_nans=True, category="Politics", drop_duplicates=True)
+    sample_stratified_per_year(data, 'E:/data/stratified_politics_sample_html.csv', n=400)

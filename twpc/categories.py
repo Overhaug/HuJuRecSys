@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # A category mapping module
 
 categories = {

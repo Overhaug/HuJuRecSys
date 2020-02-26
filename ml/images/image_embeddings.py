@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # VGG16 feature extraction
 import os
 

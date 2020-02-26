@@ -11,7 +11,7 @@ import json_lines as jl
 import pandas as pd
 from PIL import Image
 
-from ..utils import file_len
+from utils import file_len
 
 
 # Resize a set of images

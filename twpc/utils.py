@@ -67,48 +67,65 @@ def find_nth(haystack, needle, n):
 
 
 # Finds all files on a three level hierarchy of directories
-def flattened_list_of_paths(basedir="E:/images/sorted/"):
-    path = np.arange(1, 45)
-    subdir = [basedir + str(x) + "/*" for x in path]
-    per_dir = []
-    for directory in subdir:
+def all_image_paths(basedir="E:/images/sorted/"):
+    n_subdirs = np.arange(1, 45)
+    subdirs = [basedir + str(x) + "/*" for x in n_subdirs]
+    subsubdir = []
+    for directory in subdirs:
         for file in glob.glob(directory):
-            per_dir.append(file)
+            subsubdir.append(file)
 
-    nested = [glob.glob(x + "/*") for x in per_dir]
-    one_dim = [item for sublist in nested for item in sublist]
-
+    nested = [glob.glob(x + "/*") for x in subsubdir]  # Creates a list of files for each inner-most directory
+    one_dim = [item for sublist in nested for item in sublist]  # Brings all files to one list
     return one_dim
 
 
-def get_df(source, drop_nans, dt=True, topic=None, article_type=None):
+def get_df(source, drop_nans=False, dt=True, category=None, article_type=None, drop_duplicates=False):
     df = pd.read_csv(source)
+    print(f"Loaded {len(df)} articles.")
     if drop_nans is True:
         df = df.dropna()
+        print(f"{len(df)} articles after dropping articles with NaNs")
+    if drop_duplicates is True:
+        print("Dropping duplicates by main text contents")
+        df = df.drop_duplicates(subset='text')
+        print(f"{len(df)} articles after dropping exact duplicates by main text")
     if article_type is not None:
         print(f"Locating articles of type {article_type}")
         df = df.loc[df.type == article_type]
-    if topic is not None:
-        print(f"Locating articles within category {topic}")
-        df = df.loc[df.category == topic]
+        print(f"{len(df)} articles of type {article_type}")
+    if category is not None:
+        print(f"Locating articles within category {category}")
+        df = df.loc[df.category == category]
+        print(f"{len(df)} articles within category {category}")
     if dt is True:
         def to_datetime(this_df):
-            this_df['date'] = pd.to_datetime(this_df['date'], format='%Y-%m-%d', errors='coerce')
-            try:
-                this_df['time'] = pd.to_datetime(this_df['time'].apply(lambda x: x[x.rfind(" ") + 1:]),
-                                                 format="%H:%M:%S")
-                return this_df
-            except (ValueError, TypeError):
-                this_df['time'] = this_df['time'].apply(lambda x: datetime.strptime(x, "%H:%M:%S").time())
-                return this_df
-            except AttributeError:
-                print('Current DataFrame contains rows with invalid time values! '
-                      'Dropping these rows and attempting to convert again')
-                this_df = this_df[this_df['time'].notna()]
-                return to_datetime(this_df)
+            this_df['date'] = pd.to_datetime(this_df['date'])
+            this_df['date'] = this_df['date'].dt.date
+            this_df['time'] = pd.to_datetime(this_df['time'])
+            this_df['time'] = this_df['time'].dt.time
+            return this_df
+            # try:
+            #     this_df['time'] = pd.to_datetime(this_df['time'].apply(lambda x: x[x.rfind(" ") + 1:]),
+            #                                      format="%H:%M:%S")
+            #     return this_df
+            # except (ValueError, TypeError):
+            #     this_df['time'] = this_df['time'].apply(lambda x: datetime.strptime(x, "%H:%M:%S").time())
+            #     return this_df
+            # except AttributeError:
+            #     print('Current DataFrame contains rows with invalid time values! '
+            #           'Dropping these rows and attempting to convert again')
+            #     this_df = this_df[this_df['time'].notna()]
+            #     return to_datetime(this_df)
 
         df = to_datetime(df)
     return df
+
+
+def get_pivot(p):
+    df = pd.read_csv(p)
+    table = df.pivot_table(index='id')
+    return table
 
 
 # returns: paths to images found by ids in df
@@ -118,7 +135,7 @@ def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted
     allowable_path_args = ('drive', 'subdir')
     if from_path is not None and from_path not in allowable_path_args:
         raise ValueError(f"Bad argument {from_path}! Must be one of {allowable_path_args}")
-    file_paths = flattened_list_of_paths(basedir=path)
+    file_paths = all_image_paths(basedir=path)
     article_ids = df.id.tolist()
     id_paths = {}
     for file_path in file_paths:
@@ -155,3 +172,7 @@ def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted
         pd.DataFrame({'id': list(filtered_id_path.keys()), 'path': list(filtered_id_path.values())}) \
             .to_csv(save_path)
     return filtered_id_path
+
+
+g = all_image_paths()
+print()

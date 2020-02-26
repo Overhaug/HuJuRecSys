@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import calendar
 import datetime
 
@@ -396,7 +398,7 @@ def time_of_day(title, df):
 
 
 def simple_dist_graph(title, topic=None):
-    f = get_df(source=mainfile, drop_nans=True, topic=topic)
+    f = get_df(source=mainfile, drop_nans=True, category=topic)
     nums = []
     for y in years_int:
         df = f.loc[f.date.dt.year == y]

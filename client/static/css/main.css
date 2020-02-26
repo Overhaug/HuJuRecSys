@@ -15,3 +15,8 @@
 .body {
     font-size: 14px;
 }
+
+.container-first .item {
+    border: 1px solid;
+    padding: 5px;
+}

@@ -9,8 +9,6 @@ from sklearn.metrics.pairwise import linear_kernel
 
 from twpc import utils
 
-main_file = 'E:\\data\\corpus_wo_breaklines.csv'
-politics_file = 'E:\\data\\stratified_politics_sample.csv'
 
 
 # Implement all Similarity functions, which are:
@@ -35,27 +33,27 @@ def tf_idf(pivot=True):
     stemmer = SnowballStemmer("english")
     stop = stopwords.words("english")
     df['processed'] = df['text'].apply(lambda x: x.split())
-    df['processed'] = df['processed'].apply(lambda x: [w for w in x if w not in stop])
-    df['processed'] = df['processed'].apply(lambda x: ' '.join([stemmer.stem(w) for w in x]))
+    df['processed'] = df['processed'].apply(lambda word_list: [w for w in word_list if w not in stop])
+    df['processed'] = df['processed'].apply(lambda word_list: ' '.join([stemmer.stem(w) for w in word_list]))
 
-    tfidf = TfidfVectorizer().fit_transform(df.processed)
+    vectors = TfidfVectorizer().fit_transform(df.processed)
     ids = df.id.tolist()
-    tfidf_df = pd.DataFrame(columns=ids)
-    tfidf_df['id'] = ids
+    scores = pd.DataFrame(columns=ids)
+    scores['id'] = ids
 
     for i in range(0, len(df)):
-        cosine_similarities = linear_kernel(tfidf[i:i + 1], tfidf).flatten()
+        cosine_similarities = linear_kernel(vectors[i:i + 1], vectors).flatten()
         this_id = df.loc[df.index[i], 'id']
-        tfidf_df[this_id] = cosine_similarities
+        scores[this_id] = cosine_similarities
 
     if pivot:
-        table = tfidf_df.pivot_table(index='id')
-        table.to_csv("E:\\data\\tfidf_pivot.csv")
+        table = scores.pivot_table(index='id')
+        table.to_csv("E:/data/tfidf_pivot.csv")
         return
 
 
 if __name__ == '__main__':
+    politics_file = 'E:/data/stratified_politics_sample_html_plain.csv'
     df = utils.get_df(politics_file, drop_nans=False)
     tf_idf(pivot=True)
-
 # related_docs_indices = cosine_similarities.argsort()[:-6:-1]
