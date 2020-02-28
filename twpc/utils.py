@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-# Utilities used in the processing of the TWPC dataset, and for using the generated dataset afterwards
+"""
+    Utilities used in the processing of the TWPC dataset, and for using the generated dataset afterwards
+"""
 
 import glob
 import os
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -101,9 +102,9 @@ def get_df(source, drop_nans=False, dt=True, category=None, article_type=None, d
     if dt is True:
         def to_datetime(this_df):
             this_df['date'] = pd.to_datetime(this_df['date'])
-            this_df['date'] = this_df['date'].dt.date
+            # this_df['date'] = this_df['date'].dt.date
             this_df['time'] = pd.to_datetime(this_df['time'])
-            this_df['time'] = this_df['time'].dt.time
+            # this_df['time'] = this_df['time'].dt.time
             return this_df
             # try:
             #     this_df['time'] = pd.to_datetime(this_df['time'].apply(lambda x: x[x.rfind(" ") + 1:]),
@@ -129,8 +130,8 @@ def get_pivot(p):
 
 
 # returns: paths to images found by ids in df
-# If from_Path is set to either drive or subdir, returns a one-level dict with id-path pairs for only the main images,
-# else returns a multi-level dict with paths from sub directory and from drive.
+# If from_Path is set to either drive or subdir, returns a 1D dict with id-path pairs for only the main images,
+# else returns a ND dict with paths from sub directory and from drive.
 def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted/"):
     allowable_path_args = ('drive', 'subdir')
     if from_path is not None and from_path not in allowable_path_args:
@@ -164,15 +165,26 @@ def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted
                 filtered_id_path[article_id] = p[from_path]
             except KeyError:
                 n += 1
-        print(f"{n} articles have no main image!")
+        if n > 0:
+            print(f"{n} articles have no main image! If passed DataFrame contains no NaNs, "
+                  f"then the referred images are likely unavailable or corrupt, and were previously removed.")
+        else:
+            print("All articles in the passed DataFrame have a corresponding main image.")
     else:
         return filtered_id_path
     # Saving only works having passed a from_Path argument
-    if save_path is not None:
+    if save_path is not None and from_path is not None:
         pd.DataFrame({'id': list(filtered_id_path.keys()), 'path': list(filtered_id_path.values())}) \
             .to_csv(save_path)
+        print(f"Saved {len(filtered_id_path)} id-path pairs to {save_path}")
     return filtered_id_path
 
 
-g = all_image_paths()
-print()
+def get_out_file(source_path):
+    with open(source_path, mode="r") as file:
+        content = file.readlines()
+    embeddings = [x.split(",") for x in content]
+    embedding_map = {}
+    for entry in embeddings:
+        embedding_map[entry[0]] = list(entry[1:])
+    return pd.DataFrame({'id': list(embedding_map.keys()), 'embedding': list(embedding_map.values())})

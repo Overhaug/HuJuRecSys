@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Script containing different ways to use Pillow's Verify
+"""
+    Script containing different ways to use Pillow's Verify
+"""
 
 import concurrent.futures
 import os
 import threading
-from multiprocessing import Pool
 
 import numpy as np
 from PIL import Image
@@ -13,18 +14,19 @@ from PIL import Image
 from twpc.utils import all_image_paths
 
 
-def verify_one(f):
+def verify_one(file):
     try:
-        im = Image.open(f)
+        im = Image.open(file)
         im.verify()
         im.close()
         # print(f"OK: {f}")
     except (IOError, OSError, Image.DecompressionBombError):
-        print(f"Fail: {f}")
+        print(f"Fail: {file}")
 
 
 # Verify image using multiprocessing
 def mp_verify_images():
+    from multiprocessing import Pool
     p = Pool(processes=6)
 
     files = all_image_paths()
@@ -53,17 +55,20 @@ class VerifyThread(threading.Thread):
                 im.verify()
                 im.close()
             except (IOError, OSError, Image.DecompressionBombError, SyntaxError):
-                print(f"{img} failed & removed: Worker {self.worker_id} on image {index}/{end}")
-                os.remove(img)
-                n_deleted += 1
-                # print('Image {} could not be validated and will be removed'.format(file_name))
-                # os.remove(image)
-        return n_deleted
+                try:
+                    os.remove(img)
+                    print(f"W:{self.worker_id} {index}/{end}: {img} could not be verified and was removed.")
+                    n_deleted += 1
+                except PermissionError:
+                    print(f"PermissionError: W:{self.worker_id} {index}/{end}: {img} "
+                          f"The file is likely already deleted.")
+            except PermissionError:
+                print(f"PermissionError: The file is likely already deleted.")
+        print(f"Worker {self.worker_id} detected and deleted {n_deleted} unverifiable images.")
 
 
 # Verify images using multithreading
-def mt_verify_images():
-    files = all_image_paths()
+def mt_verify_images(files):
     n = 0
     threads = np.arange(1, 7, 1)
     thread_count = max(threads)
@@ -73,6 +78,21 @@ def mt_verify_images():
         thread = VerifyThread(files[n:n + chunk], i)  # Each thread receives an equal # filepaths
         n += chunk
         thread.start()
+
+
+def check_validity_of_paths(paths):
+    print("Checking validity of paths")
+    paths = [file_exists(f) for f in paths]
+    filtered_paths = list(filter(None.__ne__, paths))
+    n_not_a_path = len(paths) - len(filtered_paths)
+    if n_not_a_path != 0:
+        raise OSError(f"{n_not_a_path} paths could not be verified!")
+
+
+def file_exists(f):
+    if os.path.exists(f):
+        return f
+    return None
 
 
 # Singleprocessing
@@ -87,7 +107,7 @@ def verify_images():
 
 
 # Alternative multithreading, by using ThreadPoolExecutor
-def mt_verify_images_executor(workers=int):
+def mt_verify_images_executor(workers):
     files = all_image_paths()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         executor.map(verify_one, files)

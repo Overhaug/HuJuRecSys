@@ -1,10 +1,14 @@
 #!/usr/bin/env python
+"""
+    A module that creates samples from TWPC
+"""
+import sys
 from datetime import timedelta, date
 
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from utils import get_df, get_id_path_pairs
+from utils import get_id_path_pairs
 
 years = (2012, 2013, 2014, 2015, 2016, 2017)
 
@@ -33,27 +37,39 @@ def sample_frac_per_day(df, frac=10):
     save_as_csv(new_df, 'D:/newsRecSys/data/sample.csv')
 
 
-def sample_stratified_per_year(df, s, n, both=False):
+def sample_stratified_per_year(df, s, n):
     print(f"Sampling {n} articles per year in {years}'")
     final = pd.DataFrame()
-    file_paths = get_id_path_pairs(df, save_path="E:/data/id_path.csv", from_path="drive")
+    file_paths = get_id_path_pairs(df, from_path="drive")
     file_paths = list(file_paths.keys())
     for y in years:
         y_df = df.loc[df.date.dt.year == y]
+        sys.stdout.write("\r" + f"Year {y}: {len(y_df)}")
         y_df = y_df[y_df.id.isin(file_paths)]
         sample = y_df.sample(n)
         final = pd.concat([final, sample])
 
     save_as_csv(final, s)
     print(f"Saved {len(final)} articles to {s}")
-    if final['text'].str.contains("<br>").any():
-        final['image_caption'] = final['image_caption'].apply(lambda x: rm_html(x))
-        final['text'] = final['text'].apply(lambda x: rm_html(x))
-        final['author_bio'] = final['author_bio'].apply(lambda x: rm_html(x))
-        final['category'] = final['category'].apply(lambda x: rm_html(x))
-        new_path = s[:s.rfind(".")] + "_plain" + ".csv"
-        save_as_csv(final, new_path)
-        print(f"Saved {len(final)} articles without HTML tags to {new_path}")
+
+    def clean_current_sample(this_df):
+        if this_df['text'].str.contains("<br>").any():
+            this_df_clean = this_df.copy()
+            this_df_clean['image_caption'] = this_df_clean['image_caption'].apply(lambda x: rm_html(x))
+            this_df_clean['text'] = this_df_clean['text'].apply(lambda x: rm_html(x))
+            this_df_clean['author_bio'] = this_df_clean['author_bio'].apply(lambda x: rm_html(x))
+            this_df_clean['category'] = this_df_clean['category'].apply(lambda x: rm_html(x))
+            new_path = s[:s.rfind(".")] + "_plain" + ".csv"
+            save_as_csv(this_df_clean, new_path)
+            print(f"Saved {len(this_df_clean)} articles without HTML tags to {new_path}")
+            return this_df_clean
+
+    final_clean = clean_current_sample(this_df=final)
+    get_id_path_pairs(final, save_path="E:/data/id_path.csv", from_path="drive")
+    if final_clean is not None:
+        return final, final_clean
+    else:
+        return final
 
 
 def save_as_csv(df, path):
@@ -62,9 +78,3 @@ def save_as_csv(df, path):
 
 def rm_html(text):
     return BeautifulSoup(text, "html.parser").text
-
-
-if __name__ == '__main__':
-    main_file = 'E:/data/twp_corpus_html.csv'
-    data = get_df(main_file, drop_nans=True, category="Politics", drop_duplicates=True)
-    sample_stratified_per_year(data, 'E:/data/stratified_politics_sample_html.csv', n=400)

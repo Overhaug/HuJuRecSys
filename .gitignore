@@ -1,4 +1,4 @@
-
+.idea
 .idea/workspace.xml
 .idea/vcs.xml
 .idea/modules.xml
@@ -7,10 +7,10 @@
 .idea/encodings.xml
 .idea/dbnavigator.xml
 .idea/codeStyles/Project.xml
-testing.py
-__pycache__/Utils.cpython-36.pyc
 .idea/dictionaries/Overh.xml
-*.pyc
 .idea/codeStyles/codeStyleConfig.xml
+__pycache__/Utils.cpython-36.pyc
 *.pyc
-.idea
+testing.py
+HJ-RecSys.code-workspace
+client/__pycache__/

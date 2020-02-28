@@ -1,4 +1,6 @@
-# A super basic webapp to demonstrate results from similarity functions
+"""
+    A super basic webapp to demonstrate results from similarity functions.
+"""
 from random import randrange
 
 from flask import Flask, render_template, send_from_directory
@@ -14,7 +16,7 @@ def index():
     if refresh == 2399:
         return print("No more unique items to display")
     first_item = [get_item(x) for x in random_indexes(1)]
-    next_ids = tfidf[first_item[0]['id']].nlargest(4)
+    next_ids = scores[first_item[0]['id']].nlargest(5)
     print(f"Related articles: \n {next_ids}")
     next_ids = next_ids.index.values.tolist()
     next_ids.remove(first_item[0]['id'])
@@ -73,10 +75,14 @@ def random_indexes(n):
 
 
 refresh = 0
-df = utils.get_df("E:/data/stratified_politics_sample_html.csv", drop_nans=False)
-paths = utils.get_id_path_pairs(df, from_path="subdir")
-print("Loaded image directory")
-tfidf = utils.get_pivot("E:\\data\\tfidf_pivot.csv")
-print("Loaded TFIDF scores")
+base = "E:/data/"
+session = base + "27-02-2020-14-16" + "/"
+df = utils.get_df(session + "sample_Politics_400.csv", drop_nans=False)
+paths = utils.get_id_path_pairs(df, from_path='subdir')
+print(f"Loaded directory of {len(paths)} images")
+scores = utils.get_pivot(session + "mean_scores-pivot.csv")
+print(f"Loaded {len(scores)} scores")
+# emb, tfidfs, jw = similarity_functions.load_scores()
+
 displayed = []
 app.run()

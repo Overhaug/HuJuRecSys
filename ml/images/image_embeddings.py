@@ -1,16 +1,17 @@
 #!/usr/bin/env python
-# VGG16 feature extraction
+"""
+    VGG16 feature extraction.
+"""
 import os
 
 import numpy as np
-import pandas as pd
 from PIL import ImageFile
 from keras.applications.vgg16 import VGG16
-from keras.applications.vgg16 import preprocess_input  # , decode_predictions
+from keras.applications.vgg16 import preprocess_input
 from keras.models import Model
 from keras.preprocessing import image
 
-np.random.seed(2018)
+np.random.seed(2020)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # display model layers
@@ -22,10 +23,12 @@ base_model = VGG16(weights='imagenet')
 
 # Creates image embeddings by using the VGG16 model.
 # Output: An array of feature vector dimensions
-def embed_vgg16(files, path=None):
+def embed_vgg16(files, path):
+    try:
+        [files[i] for i in range(10)]
+    except TypeError:
+        print(f"Arg files is an iterable type, it is {type(files)}")
     broken_imgs = []
-    if path is None:
-        path = os.path.curdir + "/VGG16-embeddings.out"
     with open(path, "a") as f:
         for i, img_ in enumerate(files):
             try:
@@ -44,14 +47,13 @@ def embed_vgg16(files, path=None):
             except OSError:
                 print(f"{img_} cannot be identified. The file is probably corrupted.")
                 broken_imgs.append(img_)
-    print("Images that could not be embedded:")
-    for y in broken_imgs:
-        print(y)
+    if len(broken_imgs) > 0:
+        print("Images that could not be embedded:")
+        for y in broken_imgs:
+            print(y)
+    print(f"Embedded {len(files) - len(broken_imgs)} images")
 
-
-new_idpath = "E:/data/stratified_politics_sample.csv"
-existing_idpath = "E:/data/id_path.csv"
-
-j = pd.read_csv(existing_idpath)
-
-embed_vgg16(j['path'].values, path="E:/data/VGG16_embeddings.out")
+# if __name__ == '__main__':
+#     idpath = "E:/data/27-02-2020-14-16/id_path.csv"
+#     paths = pd.read_csv(idpath)
+#     embed_vgg16(paths['path'].values, path="E:/data/27-02-2020-14-16/VGG16-embeddings.out")

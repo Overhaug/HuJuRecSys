@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Script to download, verify and resize images from TREC Washington Post Corpus.
+"""
+    Script to download, verify and resize images from TREC Washington Post Corpus.
+
+"""
 
 import os
 import sys
