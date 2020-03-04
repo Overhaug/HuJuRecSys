@@ -3,170 +3,82 @@
 """
     A module for computing item similarity across n-length set of documents and image feature vectors
 """
-import os
-import sys
 
 import pandas as pd
-from Levenshtein import distance
-from nltk.corpus import stopwords
-from nltk.stem.snowball import SnowballStemmer
-from pyjarowinkler.distance import get_jaro_distance
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
-from sklearn.preprocessing import normalize
 
+import common
+import time_similarity
+from definitions import get_paths
 from twpc import utils
+from wrappers import bio_similarity, text_similarity, title_similarity, image_similarity
 
-
-# Implement all Similarity functions, which are:
-# TODO: TITLE - Levenshtein Distance (DONE), Jaro-Winkler distance (DONE), Longest common subsequence, Bi-gram, LDA
-# TODO: TEXT - TFIDF (DONE), BM25(?), LDA(?)
-# TODO: IMAGES - Sharpness, Brightness, Contrast, Entropy distance, Embedding cosine similarity (DONE)
-# TODO: DATE -
-# TODO: TIME - Some distance measure
-# TODO: AUTHOR - ?
-# TODO: AUTHOR BIO - Similar measure as with title, due to its inherent short length?
-
-
-def jaccard(a, b):
-    a = set(a.split(" "))
-    b = set(b.split(" "))
-    union = a.union(b)
-    intersection = a.intersection(b)
-    return len(intersection) / len(union)
-
-
-def tf_idf_cosine_sim(sp, feature):
-    print(f"Computing cosine similarity-based TF-IDF on {feature}")
-    stemmer = SnowballStemmer("english")
-    stop = stopwords.words("english")
-    print("Performing stopwords removal and stemming")
-    tfidf_copy = df.copy()
-    tfidf_copy[feature] = tfidf_copy[feature].apply(lambda x: x.split())
-    tfidf_copy[feature] = tfidf_copy[feature].apply(lambda word_list: [w for w in word_list if w not in stop])
-    tfidf_copy[feature] = tfidf_copy[feature].apply(lambda word_list: " ".join([stemmer.stem(w) for w in word_list]))
-    print("Performing vectorization")
-    vectors = TfidfVectorizer().fit_transform(df.text)
-
-    scores = cosine_similarity(vectors)
-    save_scores_as_pivot(scores, sp)
-    print("_" * 100)
-    return scores
-
-
-def embeddings_cosine_sim(file, sp):
-    print("Computing cosine similarity across image embeddings")
-    id_embeddings = utils.get_out_file(file)
-    embeddings = id_embeddings["embedding"].tolist()
-    print("Normalizing image embeddings")
-    normalized_embeddings = normalize(embeddings)
-
-    scores = cosine_similarity(normalized_embeddings)
-    save_scores_as_pivot(scores, sp)
-    print("_" * 100)
-    return scores
-
-
-def jaro_winkler(sp, feature):
-    print(f"Computing Jaro-Winkler on {feature}")
-    titles = df[feature]
-    ids = df.id.tolist()
-    scores = pd.DataFrame(columns=ids)
-    scores["id"] = ids
-    for i in range(0, len(titles)):
-        first = titles[i]
-        this_id = df.loc[df.index[i], "id"]
-        scores[this_id] = titles.apply(lambda second: get_jaro_distance(first, second, winkler=True))
-        sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
-    print()
-    save_scores_as_pivot(scores, sp)
-    print("_" * 100)
-    return scores
-
-
-def levenshtein(sp, feature):
-    print(f"Computing Levenshtein distance on {feature}")
-    titles = df[feature]
-    ids = df.id.tolist()
-    scores = pd.DataFrame(columns=ids)
-    scores["id"] = ids
-    for i in range(0, len(titles)):
-        first = titles[i]
-        this_id = df.loc[df.index[i], "id"]
-        # scores[this_id] = titles.apply(lambda a_title: distance(title, a_title))
-        scores[this_id] = titles.apply(lambda second: normalized_levenshtein(first, second))
-        sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
-    print()
-    save_scores_as_pivot(scores, sp)
-    print("_" * 100)
-    return scores
-
-
-def normalized_levenshtein(first, second):
-    max_len = max(len(first), len(second))
-    return float(max_len - distance(first, second)) / float(max_len)
-
-
-def cosine_similarity(vectors):
-    print("Computing cosine similarity")
-    ids = df.id.tolist()
-    scores = pd.DataFrame(columns=ids)
-    scores["id"] = ids
-    for i in range(0, len(df)):
-        cosine_similarities = linear_kernel(vectors[i:i + 1], vectors).flatten()
-        this_id = df.loc[df.index[i], "id"]
-        scores[this_id] = cosine_similarities
-        sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
-    print()
-    return scores
-
-
-def save_scores_as_pivot(scores, sp):
-    table = scores.pivot_table(index="id")
-    sp = sp[:sp.rfind(".")] + "-pivot.csv"
-    table.to_csv(sp)
-    print(f"Saved scores to {sp}")
+TITLE = "title"
+TEXT = "text"
+AUTHOR_BIO = "author_bio"
+IMAGE = "image"
+TIME = "time"
+DATE = "date"
 
 
 def load_scores():
-    embeddings = utils.get_pivot(session + "embedding-cosine-scores-pivot.csv")
-    tfidfs = utils.get_pivot(session + "tfidf-cosine-scores-pivot.csv")
-    jw = utils.get_pivot(session + "jw-scores-pivot.csv")
-    lev = utils.get_pivot(session + "norm-levenshtein-scores-pivot.csv")
-    return embeddings, tfidfs, jw, lev
+    scores = [utils.get_pivot(session + "pivot-embeddings-cs.csv"),
+              utils.get_pivot(session + "pivot-text-tfidf-cs.csv"),
+              utils.get_pivot(session + "pivot-bio-levenshtein.csv"),
+              utils.get_pivot(session + "pivot-title-lcs.csv")]
+    return scores
 
 
-def mean_scores(sp):
-    emb, tfidf, jw, lev = load_scores()
-    scores = pd.concat((emb, tfidf, lev))
+def mean_scores():
+    scores = load_scores()
+    scores = pd.concat(scores)
     by_row = scores.groupby(scores.index)
     df_means = by_row.mean()
-    save_scores_as_pivot(df_means, sp)
+    sp = session + "mean-scores-" + "-".join(["emb", "textTFIDF", "bioLV", "titleLCS", ".csv"])
+    common.save_scores(df_means, sp, False)
     return df_means
 
 
-def compute():
-    # tf_idf_cosine_sim(session + "tfidf-cosine-scores.csv", save_as="pivot")
-    # embeddings_cosine_sim(session + "VGG16-embeddings.out", session + "embedding-cosine-scores.csv", save_as="pivot")
-    # jaro_winkler(session + "jw-scores.csv", "title")
-    levenshtein(session + "norm-levenshtein-scores.csv", "title")
-
-
-def create_embeddings():
-    if os.path.exists(session + "id_path.csv") and not os.path.exists(session + "VGG16-embeddings.out"):
-        print("Embedding images in current session")
-        from images.image_embeddings import embed_vgg16
-        idpath = session + "id_path.csv"
-        paths = pd.read_csv(idpath)
-        embed_vgg16(paths['path'].values, path=session + "VGG16-embeddings.out")
+def compute(db):
+    if TITLE in settings:
+        if "lev" in settings[TITLE]:
+            title_similarity.title_levenshtein(session + "title-levenshtein.csv", df, db)
+        if "jw" in settings[TITLE]:
+            title_similarity.title_jw(session + "title-jarowinkler.csv", df, db)
+        if "lcs" in settings[TITLE]:
+            title_similarity.title_lcs(session + "title-lcs.csv", df, db)
+    if TEXT in settings:
+        if "tfidf" in settings[TEXT]:
+            text_similarity.text_tfidf_cosine_sim(session + "text-tfidf-cs.csv", df, db)
+    if IMAGE in settings:
+        if "emb" in settings[IMAGE]:
+            image_similarity.embeddings_cosine_sim(session + "VGG16-embeddings.out",
+                                                   session + "embeddings-cs.csv", df, db)
+    if AUTHOR_BIO in settings:
+        if "tfidf" in settings[AUTHOR_BIO]:
+            bio_similarity.bio_tfidf_cosine_sim(session + "bio-tfidf-cs.csv", df, db)
+        if "jaccard" in settings[AUTHOR_BIO]:
+            bio_similarity.bio_jaccard(session + "bio-jaccard.csv", df, db)
+        if "lev" in settings[AUTHOR_BIO]:
+            bio_similarity.bio_levenshtein(session + "bio-levenshtein.csv", df, db)
+    if TIME in settings:
+        if "tdelta" in settings[TIME]:
+            time_similarity.time_distance(session + "time-tdelta.csv", df, db)
 
 
 if __name__ == '__main__':
-    base = "E:/data/"
-    session = base + "27-02-2020-14-16" + "/"
+    ospaths = get_paths()
+    session = "27-02-2020-14-16"
+    session = ospaths["datadir"] + session + "/"
     print(f"Session directory: {session}")
-    create_embeddings()
     sf = session + "sample_Politics_400_plain.csv"
-    df = utils.get_df(sf, drop_nans=False)
-    # compute()
-    mean_scores(session + "mean_scores-lev.csv")
+    # df = utils.get_df(sf, drop_nans=False, dt=True)
+    settings = {
+        #TITLE: ["lev", "jw", "lcs"],
+        #TEXT: ["tfidf"],
+        #IMAGE: ["emb"],
+        #AUTHOR_BIO: ["lev", "tfidf", "jaccard"],
+        TIME: ["tdelta"]
+
+    }
+    # compute(db=False)
+    mean_scores()

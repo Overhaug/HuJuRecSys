@@ -14,3 +14,5 @@ __pycache__/Utils.cpython-36.pyc
 testing.py
 HJ-RecSys.code-workspace
 client/__pycache__/
+/definitions.txt
+client/app.db

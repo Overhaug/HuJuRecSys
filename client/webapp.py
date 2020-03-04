@@ -5,6 +5,7 @@ from random import randrange
 
 from flask import Flask, render_template, send_from_directory
 
+from definitions import get_paths
 from twpc import utils
 
 app = Flask(__name__, template_folder="templates")
@@ -25,22 +26,27 @@ def index():
     return render_template('index.html', f_item=first_item[0], n_items=next_3)
 
 
+@app.route("/random")
+def ran():
+    items = [get_item(df, x) for x in random_indexes(5)]
+    return render_template('random-articles.html', items=items)
+
+
 @app.route('/uploads/<path:filename>')
 def download_file(filename):
-    return send_from_directory("E:/images/Sorted/", filename, as_attachment=True)
+    return send_from_directory(ospaths["imagedir"], filename, as_attachment=True)
 
 
-def get_item(i, by='index'):
-    if by == 'id':
+def get_item(i, by="index"):
+    if by == "id":
         df2 = df.loc[df.id == i].T.squeeze()
         print(f"Related article: {df2.id}")
     else:  # By index
         df2 = df.loc[df.index[i]]
         print(f"Main article: {df2.id}")
     try:
-        image = paths[df2.id].replace("\\", "/")
+        image = paths[df2.id]
     except KeyError:
-        print(f"{df2.id} has no main image!")
         return
     return {
         "id": df2.id,
@@ -74,15 +80,16 @@ def random_indexes(n):
     return indexes
 
 
-refresh = 0
-base = "E:/data/"
-session = base + "27-02-2020-14-16" + "/"
-df = utils.get_df(session + "sample_Politics_400.csv", drop_nans=False)
-paths = utils.get_id_path_pairs(df, from_path='subdir')
-print(f"Loaded directory of {len(paths)} images")
-scores = utils.get_pivot(session + "mean_scores-pivot.csv")
-print(f"Loaded {len(scores)} scores")
-# emb, tfidfs, jw = similarity_functions.load_scores()
-
-displayed = []
-app.run()
+if __name__ == '__main__':
+    refresh = 0
+    ospaths = get_paths()
+    session = "27-02-2020-14-16"
+    session = ospaths["datadir"] + session + "/"
+    df = utils.get_df(session + "sample_Politics_400.csv")
+    # full = utils.get_df(session + "twp_corpus_html.csv", drop_nans=True)
+    paths = utils.get_id_path_pairs(df, from_path="subdir")
+    print(f"Loaded location of {len(paths)} images")
+    scores = utils.get_pivot(session + "pivot-mean-scores-emb-textTFIDF-bioLV-titleLCS-.csv")
+    print(f"Loaded {len(scores)} scores")
+    displayed = []
+    app.run(host='127.0.0.1', port=8000)

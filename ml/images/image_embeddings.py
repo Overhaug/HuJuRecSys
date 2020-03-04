@@ -54,6 +54,11 @@ def embed_vgg16(files, path):
     print(f"Embedded {len(files) - len(broken_imgs)} images")
 
 # if __name__ == '__main__':
-#     idpath = "E:/data/27-02-2020-14-16/id_path.csv"
-#     paths = pd.read_csv(idpath)
-#     embed_vgg16(paths['path'].values, path="E:/data/27-02-2020-14-16/VGG16-embeddings.out")
+# import pandas as pd
+# idpath = "E:/data/27-02-2020-14-16/id_path.csv"
+# paths = pd.read_csv(idpath)
+# start = time.time()
+# embed_vgg16(paths['path'].values, path="E:/data/27-02-2020-14-16/VGG16-embeddings.out")
+# end = time.time()
+# g = end - start
+# print("%.f2" % g)

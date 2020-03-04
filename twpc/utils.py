@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
     Utilities used in the processing of the TWPC dataset, and for using the generated dataset afterwards
 """
@@ -6,8 +8,9 @@
 import glob
 import os
 
-import numpy as np
 import pandas as pd
+
+import definitions
 
 
 # last-index-of
@@ -67,27 +70,13 @@ def find_nth(haystack, needle, n):
     return start
 
 
-# Finds all files on a three level hierarchy of directories
-def all_image_paths(basedir="E:/images/sorted/"):
-    n_subdirs = np.arange(1, 45)
-    subdirs = [basedir + str(x) + "/*" for x in n_subdirs]
-    subsubdir = []
-    for directory in subdirs:
-        for file in glob.glob(directory):
-            subsubdir.append(file)
-
-    nested = [glob.glob(x + "/*") for x in subsubdir]  # Creates a list of files for each inner-most directory
-    one_dim = [item for sublist in nested for item in sublist]  # Brings all files to one list
-    return one_dim
-
-
-def get_df(source, drop_nans=False, dt=True, category=None, article_type=None, drop_duplicates=False):
+def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, drop_duplicates=False):
     df = pd.read_csv(source)
-    print(f"Loaded {len(df)} articles.")
-    if drop_nans is True:
+    print(f"Loaded {len(df)} rows.")
+    if drop_nans:
         df = df.dropna()
         print(f"{len(df)} articles after dropping articles with NaNs")
-    if drop_duplicates is True:
+    if drop_duplicates:
         print("Dropping duplicates by main text contents")
         df = df.drop_duplicates(subset='text')
         print(f"{len(df)} articles after dropping exact duplicates by main text")
@@ -102,22 +91,10 @@ def get_df(source, drop_nans=False, dt=True, category=None, article_type=None, d
     if dt is True:
         def to_datetime(this_df):
             this_df['date'] = pd.to_datetime(this_df['date'])
-            # this_df['date'] = this_df['date'].dt.date
+            this_df['date'] = this_df['date'].dt.date
             this_df['time'] = pd.to_datetime(this_df['time'])
-            # this_df['time'] = this_df['time'].dt.time
+            this_df['time'] = this_df['time'].dt.time
             return this_df
-            # try:
-            #     this_df['time'] = pd.to_datetime(this_df['time'].apply(lambda x: x[x.rfind(" ") + 1:]),
-            #                                      format="%H:%M:%S")
-            #     return this_df
-            # except (ValueError, TypeError):
-            #     this_df['time'] = this_df['time'].apply(lambda x: datetime.strptime(x, "%H:%M:%S").time())
-            #     return this_df
-            # except AttributeError:
-            #     print('Current DataFrame contains rows with invalid time values! '
-            #           'Dropping these rows and attempting to convert again')
-            #     this_df = this_df[this_df['time'].notna()]
-            #     return to_datetime(this_df)
 
         df = to_datetime(df)
     return df
@@ -129,31 +106,37 @@ def get_pivot(p):
     return table
 
 
+# Finds all files on a three level hierarchy of directories
+def all_image_paths(basedir=definitions.get_paths()["imagedir"]):
+    return glob.glob(basedir + "*/*/*")
+
+
 # returns: paths to images found by ids in df
 # If from_Path is set to either drive or subdir, returns a 1D dict with id-path pairs for only the main images,
 # else returns a ND dict with paths from sub directory and from drive.
-def get_id_path_pairs(df, from_path=None, save_path=None, path="E:/images/sorted/"):
+def get_id_path_pairs(df, from_path=None, save_path=None):
     allowable_path_args = ('drive', 'subdir')
     if from_path is not None and from_path not in allowable_path_args:
         raise ValueError(f"Bad argument {from_path}! Must be one of {allowable_path_args}")
-    file_paths = all_image_paths(basedir=path)
+    file_paths = all_image_paths()
     article_ids = df.id.tolist()
     id_paths = {}
-    for file_path in file_paths:
-        base_id = file_path[file_path.rfind("\\") + 1:file_path.rfind("-")]
-        file_id = file_path[file_path.rfind("\\") + 1:file_path.rfind(".")]
-        from_base = file_path[file_path.rfind("/") + 1:]
+    for full_path in file_paths:
+        full_path = full_path.replace("\\", "/").lower()
+        base_id = full_path[full_path.rfind("/") + 1:full_path.rfind("-")]
+        file_id = full_path[full_path.rfind("/") + 1:full_path.rfind(".")]
+        from_parent = full_path[full_path.find("sorted/") + 6:]
         if base_id in id_paths.keys():
             id_paths[base_id].update({  # Updates existing dictionary
                 file_id: {
-                    'drive': file_path,
-                    'subdir': from_base
+                    'drive': full_path,
+                    'subdir': from_parent
                 }})
         else:
             id_paths[base_id] = {  # Creates a dictionary with id as key
                 file_id: {
-                    'drive': file_path,
-                    'subdir': from_base
+                    'drive': full_path,
+                    'subdir': from_parent
                 }}
 
     filtered_id_path = {}
