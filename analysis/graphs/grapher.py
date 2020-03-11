@@ -10,7 +10,7 @@ import pandas as pd
 
 from twpc.utils import get_df
 
-pd.set_option('display.max_colwidth', -1)
+pd.set_option('display.max_colwidth', None)
 months = {
     1: ['January', 'Jan'], 2: ['February', 'Feb'], 3: ['March', 'Mar'], 4: ['April', 'Apr'], 5: ['May', 'May'],
     6: ['June', 'June'],
@@ -42,7 +42,7 @@ def year_month_day_distribution(df, title):
             except TypeError:
                 pass  # No Mondays in the current month
             axes.grid(axis='y', linewidth=0.3)
-            axes.plot(data.day, data.counts)
+            axes.plot(data.day, data.counts)  # todo: Change to max ytick of 1000
             n += 1
 
     for ax, month in zip(ax_array[0], months):

@@ -70,7 +70,7 @@ def find_nth(haystack, needle, n):
     return start
 
 
-def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, drop_duplicates=False):
+def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, drop_duplicates=False, has_image=False):
     df = pd.read_csv(source)
     print(f"Loaded {len(df)} rows.")
     if drop_nans:
@@ -88,6 +88,11 @@ def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, 
         print(f"Locating articles within category {category}")
         df = df.loc[df.category == category]
         print(f"{len(df)} articles within category {category}")
+    if has_image:
+        print("Filtering out articles without a main image")
+        file_paths = get_id_path_pairs(df, from_path="drive")
+        df = df[df.id.isin(file_paths)]
+        print(f"{len(df)} articles with a main image")
     if dt is True:
         def to_datetime(this_df):
             this_df['date'] = pd.to_datetime(this_df['date'])
@@ -171,3 +176,10 @@ def get_out_file(source_path):
     for entry in embeddings:
         embedding_map[entry[0]] = list(entry[1:])
     return pd.DataFrame({'id': list(embedding_map.keys()), 'embedding': list(embedding_map.values())})
+
+
+def get_for_feature(p, feature):
+    df = pd.read_csv(p)
+    df = df.filter(["image", feature])
+    df["id"] = df["image"].apply(lambda i: i[:i.find(".")])
+    return df

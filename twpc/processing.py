@@ -7,6 +7,7 @@
 import os
 from datetime import datetime
 
+import definitions
 import sampler
 import utils
 from twpc import twpc_articles
@@ -24,21 +25,25 @@ class Process:
     """
     valid_scopes = ("mainfile", "sample", "both")
 
-    def __init__(self, which="all", base_dir="E:/data/", source_path="E:/data/corpus/TWPC.jl", main_path=None,
+    def __init__(self, which="all", base_dir=None, source_path=None, main_path=None,
                  category=None, drop_nans=None, drop_duplicates=None, n=None):
+        self.paths = definitions.get_paths()
         self.which = which.lower()
         self.category = category
         self.drop_nans = drop_nans
         self.drop_duplicates = drop_duplicates
         self.n = n
-        self.base_dir = base_dir if base_dir.endswith("/") else base_dir + "/"
-        self.source_path = source_path
-        self.main_path = main_path
+        self.base_dir = base_dir if base_dir is not None and base_dir.endswith("/") else self.paths["basedir"]
+        self.source_path = source_path if source_path is not None else self.paths["corpusdir"]
         self.session_path = self.__create_session_directory()
+        self.paths["sessionpath"] = self.session_path
+        self.main_path = main_path if main_path is not None else self.paths["sessionpath"]\
+                                                                 + "twpc-" + self.which + ".csv"
         self.__validate_args()
         self.sample_path = self.session_path + "sample_" + self.category + "_" + str(self.n) + ".csv"
         self.sample_file = None
         self.main_file = None
+        self.run()
 
     def __validate_args(self):
         if self.which not in self.valid_scopes:
@@ -52,13 +57,13 @@ class Process:
                 raise OSError(f"File {self.main_path} does not exist!")
         if not os.path.isdir(self.base_dir):
             raise OSError(f"{self.base_dir} is not a directory!")
-        if self.which in ("both", "mainfile") and not os.path.isdir(self.source_path):
+        if self.which in ("both", "mainfile") and not os.path.exists(self.source_path):
             raise OSError(f"{self.source_path} is not a directory!")
 
     def __create_session_directory(self):
         timestamp = datetime.now()
         ts_string = timestamp.strftime("%d-%m-%Y-%H-%M")
-        os.mkdir(self.base_dir + ts_string)
+        os.mkdir(self.paths["datadir"] + ts_string)
         return self.base_dir + ts_string + "/"
 
     def run(self):
@@ -72,8 +77,8 @@ class Process:
 
     def __mainfile(self):
         twpc_helper = TWPCHelper(
-            source_path=self.base_dir + "corpus/TWPC.jl",
-            save_path=self.base_dir + "twpc_corpus_html.csv"
+            source_path=self.paths["datadir"] + "corpus/TWPC.jl",
+            save_path=self.session_path + "twpc_corpus_html.csv"
         )
         this = twpc_articles.TWPC(twpc_helper)
         this.run()
@@ -86,5 +91,5 @@ class Process:
 
 
 if __name__ == '__main__':
-    proc = Process(which="sample", drop_nans=True,
-                   drop_duplicates=True, category="Politics", n=400, main_path="E:/data/twp_corpus_html.csv")
+    proc = Process(which="mainfile", drop_nans=True,
+                   drop_duplicates=True, category="Politics", n=400)

@@ -6,6 +6,7 @@
 """
 
 import os
+import shutil
 import sys
 import time
 
@@ -13,8 +14,12 @@ import grequests
 import json_lines as jl
 import pandas as pd
 from PIL import Image
+from PIL import ImageFile
 
+import utils
 from utils import file_len
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 # Resize a set of images
@@ -287,9 +292,24 @@ def extract_image_urls(source, save_loc='image_urls.csv', batch_size=20000):
                 save_as_csv(get_image_url(articles), path=save_loc)
 
 
+def copy_images(src, dst):
+    """"
+        :param src -- path to the current sample CSV
+    """
+    df = utils.get_df(src, drop_nans=False, dt=True)
+    idpath = utils.get_id_path_pairs(df, from_path="drive")
+    images = list(idpath.values())
+    ids = list(idpath.keys())
+
+    for i in range(len(images)):
+        file = images[i]
+        ext = file[file.rfind("."):]
+        shutil.copyfile(file, dst + ids[i] + ext)
+
+
 if __name__ == '__main__':
     # image_fetcher(batch_size=10, start_index=10, max_retries=1,
     #              source='../HuJuData/data/processed/image_urls.csv',
     #              save_loc='../HuJuData/data/processed/images/')
-
-    extract_image_urls(source='../HuJuData/data/corpus/TWPC.jl', batch_size=200000)
+    print()
+    # extract_image_urls(source='../HuJuData/data/corpus/TWPC.jl', batch_size=200000)

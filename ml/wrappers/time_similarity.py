@@ -1,7 +1,11 @@
 import common
 
-TIME = "time"
+FEATURE = "time"
 
 
-def time_distance(sp, df, db):
-    common.time_distance(sp, df, TIME, db)
+def time_week_distance(sp, df, db):
+    common.week_distance(sp, df, FEATURE, db)
+
+
+def time_exp_decay(sp, df, db):
+    common.exp_time_decay(sp, df, FEATURE, db)

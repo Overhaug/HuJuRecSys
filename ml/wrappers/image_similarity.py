@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import normalize
 
 import common
+import image_feature_extraction
 import utils
 
 
@@ -26,3 +27,28 @@ def create_embeddings(session):
         idpath = session + "id_path.csv"
         paths = pd.read_csv(idpath)
         embed_vgg16(paths['path'].values, path=session + "VGG16-embeddings.out")
+
+
+def image_sharpness(sp, sp2, df, db, update):
+    if update:
+        image_feature_extraction.image_sharpness(sp, df)
+    common.compute_distance(sp, sp2, "sharpness", db)
+
+
+def image_shannon(sp, sp2, df, db, update):
+    if update:
+        image_feature_extraction.image_shannon_entropy(sp, df)
+    common.compute_distance(sp, sp2, "shannon", db)
+
+
+def image_calculate_computed_metrics(sp, sp2, feature, db):
+    data = utils.get_for_feature(sp, feature)
+    common.compute_distance(data, sp2, feature, db)
+
+
+def preload(dirpath):
+    image_feature_extraction.load_images_as_greyscale(dirpath)
+
+
+def clear():
+    image_feature_extraction.clear()
