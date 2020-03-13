@@ -5,7 +5,6 @@
 """
 
 import pandas as pd
-import pprint
 
 import common
 from definitions import get_paths
@@ -57,6 +56,8 @@ def compute(db, update):
     if TEXT in metrics:
         if "tfidf" in metrics[TEXT]:
             text_similarity.text_tfidf_cosine_sim(SESSION + "text-tfidf-cs.csv", df, db)
+        if "tfidf_constr" in metrics[TEXT]:
+            text_similarity.text_tfidf_cosine_sim_length_constrained(SESSION + "text-tfidf-cs-constr.csv", df, 400, db)
         # Subjectivity and sentiment could be computed in the same run (which would be faster, too)
         # They are separated so it is more clear what they do.
         if "subjectivity" in metrics[TEXT]:
@@ -113,7 +114,8 @@ if __name__ == '__main__':
         # IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
         # AUTHOR_BIO: ["lev", "tfidf", "jaccard"],
         # TIME: ["exp_decay"],
-        TEXT: ["sentiment", "subjectivity"]
+        # TEXT: ["sentiment", "subjectivity"]
+        TEXT: ["tfidf_constr"]
     }
-    compute(db=False, update=True)
+    compute(db=False, update=False)
     # mean_scores()

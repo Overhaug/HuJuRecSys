@@ -12,6 +12,12 @@ def text_tfidf_cosine_sim(sp, df, db):
     common.cosine_similarity(sp, df, vectors, db)
 
 
+def text_tfidf_cosine_sim_length_constrained(sp, df, n, db):
+    df[FEATURE] = common.constrain_length(df, FEATURE, n)
+    vectors = common.tfidf(df, FEATURE)
+    common.cosine_similarity(sp, df, vectors, db)
+
+
 def text_textblob(sp, sp2, df, db, scoretype: tuple, update):
     if update:
         common.textblob_scores(sp, df, FEATURE, db, scoretype)

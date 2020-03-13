@@ -2,8 +2,9 @@
 """
     A module that creates samples from TWPC
 """
+import os
 import sys
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -37,7 +38,14 @@ def sample_frac_per_day(df, frac=10):
     save_as_csv(new_df, 'D:/newsRecSys/data/sample.csv')
 
 
-def sample_stratified_per_year(df, s, n):
+def sample_stratified_per_year(df, sp, n):
+    timestamp = datetime.now()
+    ts_string = timestamp.strftime("%d-%m-%Y-%H-%M")
+    sp = sp + ts_string
+    session = sp[:sp.rfind("/")]
+    if os.path.exists(session):
+        raise OSError(f"Session {session} exists")
+    os.mkdir(session)
     print(f"Sampling {n} articles per year in {years}'")
     final = pd.DataFrame()
     file_paths = get_id_path_pairs(df, from_path="drive")
@@ -49,8 +57,8 @@ def sample_stratified_per_year(df, s, n):
         sample = y_df.sample(n)
         final = pd.concat([final, sample])
 
-    save_as_csv(final, s)
-    print(f"Saved {len(final)} articles to {s}")
+    save_as_csv(final, sp)
+    print(f"Saved {len(final)} articles to {sp}")
 
     def clean_current_sample(this_df):
         if this_df['text'].str.contains("<br>").any():
@@ -59,7 +67,7 @@ def sample_stratified_per_year(df, s, n):
             this_df_clean['text'] = this_df_clean['text'].apply(lambda x: rm_html(x))
             this_df_clean['author_bio'] = this_df_clean['author_bio'].apply(lambda x: rm_html(x))
             this_df_clean['category'] = this_df_clean['category'].apply(lambda x: rm_html(x))
-            new_path = s[:s.rfind(".")] + "_plain" + ".csv"
+            new_path = sp[:sp.rfind(".")] + "_plain" + ".csv"
             save_as_csv(this_df_clean, new_path)
             print(f"Saved {len(this_df_clean)} articles without HTML tags to {new_path}")
             return this_df_clean

@@ -5,7 +5,6 @@
 """
 import math
 import sys
-from datetime import timedelta, datetime
 
 import pandas as pd
 import pylcs
@@ -26,33 +25,29 @@ def cosine_similarity(sp, df, vectors, db):
     ids = df.id.tolist()
     print("Computing cosine similarity")
 
-    def for_db():
+    def cs_for_db():
         scores = pd.DataFrame(columns=["id", "score", "referred_id"])
         for i in range(0, len(df)):
-            # cs = [1 - tf.losses.cosine_similarity(vectors[i], vectors[i:i + 1], axis=0) for _ in range(len(df))]
             cosine_similarities = linear_kernel(vectors[i:i + 1], vectors).flatten()
-            this_id = ids[i]
             scores = scores.append(
                 [pd.DataFrame(
-                    {"id": [this_id for _ in range(len(df))], "score": cosine_similarities, "referred_id": ids})],
+                    {"id": [ids[i] for _ in range(len(df))], "score": cosine_similarities, "referred_id": ids})],
                 ignore_index=True)
             sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
         return scores
 
-    def for_pivot():
+    def cs_for_pivot():
         scores = pd.DataFrame(columns=ids)
         scores["id"] = ids
         for i in range(0, len(df)):
-            cosine_similarities = linear_kernel(vectors[i:i + 1], vectors).flatten()
-            this_id = ids[i]
-            scores[this_id] = cosine_similarities
+            scores[ids[i]] = linear_kernel(vectors[i:i + 1], vectors).flatten()
             sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
         return scores
 
     if db:
-        result = for_db()
+        result = cs_for_db()
     else:
-        result = for_pivot()
+        result = cs_for_pivot()
     print()
     save_scores(result, sp=sp, db=db)
     print("_" * 100)
@@ -80,6 +75,10 @@ def remove_stopwords(text):
     stop = stopwords.words("english")
     text = text.apply(lambda x: x.split())
     return text.apply(lambda word_list: " ".join([w for w in word_list if w not in stop]))
+
+
+def constrain_length(df, feature, n):
+    return df[feature].apply(lambda text: ' '.join(text.split(" ")[:n]))
 
 
 def levenshtein(sp, df, feature, db):
