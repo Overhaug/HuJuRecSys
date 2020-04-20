@@ -20,8 +20,10 @@ from textblob import TextBlob
 
 import utils
 
+DATE_IS_STRINGIFIED = False
 
-def cosine_similarity(sp, df, vectors, db):
+
+def cosine_similarity(sp, df, vectors):
     ids = df.id.tolist()
     print("Computing cosine similarity")
 
@@ -44,13 +46,11 @@ def cosine_similarity(sp, df, vectors, db):
             sys.stdout.write("\r" + f"{i + 1}/{len(df)}")
         return scores
 
-    if db:
-        result = cs_for_db()
-    else:
-        result = cs_for_pivot()
-    print()
-    save_scores(result, sp=sp, db=db)
-    print("_" * 100)
+    result = cs_for_pivot()
+    # print()
+    # save_scores(result, sp=sp, db=db)
+    return result
+    # print("_" * 100)
 
 
 def tfidf(df, feature):
@@ -81,37 +81,29 @@ def constrain_length(df, feature, n):
     return df[feature].apply(lambda text: ' '.join(text.split(" ")[:n]))
 
 
-def levenshtein(sp, df, feature, db):
+def levenshtein(sp, df, feature):
     print(f"Computing Levenshtein distance on {feature}")
     text = df[feature]
 
     def normalized_levenshtein(s1, s2):
         max_len = max(len(s1), len(s2))
-        return float(max_len - distance(s1, s2)) / float(max_len)
+        return 1 - float(distance(s1, s2)) / float(max_len)
 
-    if db:
-        result = for_db(text, df, normalized_levenshtein)
-    else:
-        result = for_pivot(text, df, normalized_levenshtein)
-    print()
-    save_scores(result, sp=sp, db=db)
+    result = for_pivot(text, df, normalized_levenshtein)
+    save_as_pivot(result, sp=sp)
     print("_" * 100)
 
 
-def jaro_winkler(sp, df, feature, db):
+def jaro_winkler(sp, df, feature):
     print(f"Computing Jaro-Winkler on {feature}")
     text = df[feature]
 
-    if db:
-        result = for_db(text, df, get_jaro_distance)
-    else:
-        result = for_pivot(text, df, get_jaro_distance)
-    print()
-    save_scores(result, sp=sp, db=db)
+    result = for_pivot(text, df, get_jaro_distance)
+    save_as_pivot(result, sp=sp)
     print("_" * 100)
 
 
-def jaccard(sp, df, feature, db):
+def jaccard(sp, df, feature):
     print(f"Computing Jaccard distance on {feature}")
     text = df[feature]
 
@@ -122,16 +114,12 @@ def jaccard(sp, df, feature, db):
         s2 = set(filter(None, s2))
         return jaccard_distance(s1, s2)
 
-    if db:
-        result = for_db(text, df, compute)
-    else:
-        result = for_pivot(text, df, compute)
-    print()
-    save_scores(result, sp=sp, db=db)
+    result = for_pivot(text, df, compute)
+    save_as_pivot(result, sp=sp)
     print("_" * 100)
 
 
-def longest_common_subsequence(sp, df, feature, db):
+def longest_common_subsequence(sp, df, feature):
     print(f"Computing Longest Common Sequence distance on {feature}")
     text = df[feature]
 
@@ -140,17 +128,13 @@ def longest_common_subsequence(sp, df, feature, db):
         lcs = pylcs.lcs(s1, s2).__float__()
         return 1 - float(max_len - lcs) / float(max_len)
 
-    if db:
-        results = for_db(text, df, compute_normalized)
-    else:
-        results = for_pivot(text, df, compute_normalized)
-    print()
-    save_scores(results, sp=sp, db=db)
+    results = for_pivot(text, df, compute_normalized)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
     return
 
 
-def week_distance(sp, df, feature, db):
+def week_distance(sp, df, feature):
     print(f"Computing time distance on {feature}")
     df["datetime"] = concat_date_time(df)
 
@@ -170,22 +154,21 @@ def week_distance(sp, df, feature, db):
             weight = 1.0
         return smallest / largest
 
-    if db:
-        results = for_db(df["datetime"], df, compute)
-    else:
-        results = for_pivot(df["datetime"], df, compute)
-    print()
-    save_scores(results, sp=sp, db=db)
+    results = for_pivot(df["datetime"], df, compute)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
 def concat_date_time(df):
-    df["date"] = df["date"].apply(lambda t: t.strftime(format="%Y-%m-%d"))
-    df["time"] = df["time"].apply(lambda t: t.strftime(format="%H:%M:%S"))
+    global DATE_IS_STRINGIFIED
+    if not DATE_IS_STRINGIFIED:
+        df["date"] = df["date"].apply(lambda t: t.date().strftime(format="%Y-%m-%d"))
+        df["time"] = df["time"].apply(lambda t: t.time().strftime(format="%H:%M:%S"))
+        DATE_IS_STRINGIFIED = True
     return pd.to_datetime(df["date"] + " " + df["time"])
 
 
-def exp_time_decay(sp, df, feature, db):
+def exp_time_decay(sp, df):
     print(f"Computing exponential time decay")
     df["datetime"] = concat_date_time(df)
 
@@ -199,16 +182,12 @@ def exp_time_decay(sp, df, feature, db):
         factor = 0.95
         return 1.0 * (factor ** math.sqrt(td.days))
 
-    if db:
-        results = for_db(df["datetime"], df, compute)
-    else:
-        results = for_pivot(df["datetime"], df, compute)
-    print()
-    save_scores(results, sp=sp, db=db)
+    results = for_pivot(df["datetime"], df, compute)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
-def textblob_scores(sp, df, feature, db, score_type: tuple):
+def textblob_scores(sp, df, feature, score_type: tuple):
     """
         :param score_type must be a tuple of either "0, sentiment", or "1, subjectivity"
     """
@@ -228,46 +207,42 @@ def textblob_scores(sp, df, feature, db, score_type: tuple):
         func = compute_normalize
 
     results = for_dataframe(text, df, score_type[1], feature, func)
-    print()
-    save_scores(results, sp=sp, db=db)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
-def n_gram(sp, df, feature, db, n):
+def n_gram(sp, df, feature, n):
     print(f"Computing n-gram by a factor of {n} on {feature}")
     titles = df[feature]
 
     def compute(s1, s2):
         return NGram.compare(s1, s2, N=n)
 
-    if db:
-        results = for_db(titles, df, compute)
-    else:
-        results = for_pivot(titles, df, compute)
-    print()
-    save_scores(results, sp=sp, db=db)
+    results = for_pivot(titles, df, compute)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
+def normalize_and_calculate_distance(f1, f2):
+    return 1 - float(max(f1, f2) - min(f1, f2)) / float(max(f1, f2))
+
+
 def calculate_distance(f1, f2):
-    """
-        Calculate similarity distance between two positive floats
-    """
-    return min(f1, f2) / max(f1, f2)
+    return 1 - math.fabs(f1 - f2)
 
 
-def compute_distance(df, sp, feature, db):
+def compute_distance(df, sp, feature, normalize):
     print(f"Computing distance similarity for {feature}")
     if not isinstance(df, pd.DataFrame):
         measures = utils.get_df(df)
     else:
         measures = df
-    if db:
-        results = for_db(measures[feature], measures, calculate_distance)
-    else:
-        results = for_pivot(measures[feature], measures, calculate_distance)
+    func = calculate_distance
+    if normalize:
+        func = normalize_and_calculate_distance
+    results = for_pivot(measures[feature], measures, func)
     print()
-    save_scores(results, sp=sp, db=db)
+    save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
@@ -311,15 +286,8 @@ def for_dataframe(data, df, score_name, feature, func):
     return scores
 
 
-def save_scores(scores, sp, db):
-    if db:
-    #     p = sp[:sp.rfind("/") + 1]
-    #     s = sp[sp.rfind("/") + 1:]
-    #     sp = p + "db-" + s
-    # else:
-    #     p = sp[:sp.rfind("/") + 1]
-    #     s = sp[sp.rfind("/") + 1:]
-    #     sp = p + "pivot-" + s
-        scores = scores.pivot_table(index="id")
+def save_as_pivot(scores, sp):
+    print()
+    scores = scores.pivot_table(index="id")
     scores.to_csv(sp)
     print(f"Saved scores to {sp}")

@@ -14,9 +14,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def load_images_as_greyscale(files):
-    """
-        Beware: Takes a lot of memory (on avg., 2400 images from TWPC == 2.5 GB, ~16 GB memory.)
-    """
     print(f"Loading images in {files}")
     files = glob.glob(files + "/*")
     global images
@@ -42,7 +39,7 @@ def image_sharpness(sp, df):
 
     results = common.for_dataframe(images, df, "sharpness", FEATURE, compute)
     print()
-    common.save_scores(results, sp=sp, db=False)
+    common.save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 
@@ -58,7 +55,7 @@ def image_shannon_entropy(sp, df):
 
     results = common.for_dataframe(images, df, "shannon", FEATURE, compute)
     print()
-    common.save_scores(results, sp=sp, db=False)
+    common.save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 

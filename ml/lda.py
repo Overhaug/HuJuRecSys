@@ -15,7 +15,7 @@ import common
 
 def create_dictionary(session, df, feature):
     print(f"Updating dictionary for feature {feature}")
-    documents = df["text"]
+    documents = df[feature]
     documents = common.remove_stopwords(documents).tolist()
     texts = [doc.split() for doc in documents]
     dictionary = Dictionary(texts)
@@ -26,7 +26,7 @@ def create_model(session, df, feature):
     print(f"Updating model for feature {feature}")
     freeze_support()
     dct = get_dict(feature, session)
-    corpus = common.remove_stopwords(df["text"]).tolist()
+    corpus = common.remove_stopwords(df[feature]).tolist()
     corpus = [doc.split() for doc in corpus]
     corpus = [dct.doc2bow(text) for text in corpus]
     dct = Dictionary.load(session + "LDA-dictionary-" + feature + ".pk1")
@@ -34,7 +34,7 @@ def create_model(session, df, feature):
     lda_model.save(session + "LDA-model-" + feature)
 
 
-def cs_lda(sp, df, feature, db, session, update_model):
+def cs_lda(sp, df, feature, session, update_model):
     print(f"Starting LDA ...")
     if update_model:
         session = session + "lda-" + feature
@@ -48,7 +48,7 @@ def cs_lda(sp, df, feature, db, session, update_model):
         session = session + "lda-" + feature
     print(f"Computing Cosine Similarity on feature {feature}")
     dct = get_dict(feature, session)
-    corpus = common.remove_stopwords(df["text"]).tolist()
+    corpus = common.remove_stopwords(df[feature]).tolist()
     corpus = [doc.split() for doc in corpus]
     corpus = [dct.doc2bow(text) for text in corpus]
     lda = LdaMulticore.load(session + "LDA-model-" + feature)
@@ -68,7 +68,7 @@ def cs_lda(sp, df, feature, db, session, update_model):
     else:
         results = for_pivot(df[feature], df, compute)
     print()
-    common.save_scores(results, sp=sp, db=db)
+    common.save_as_pivot(results, sp=sp)
     print("_" * 100)
 
 

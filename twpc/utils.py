@@ -7,8 +7,10 @@
 
 import glob
 import os
+import sys
 
 import pandas as pd
+from bs4 import BeautifulSoup
 
 import definitions
 
@@ -71,11 +73,11 @@ def find_nth(haystack, needle, n):
 
 
 def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, drop_duplicates=False, has_image=False):
-    df = pd.read_csv(source)
+    df = pd.read_csv(source, sep=",")
     print(f"Loaded {len(df)} rows.")
     if drop_nans:
         df = df.dropna()
-        print(f"{len(df)} articles after dropping articles with NaNs")
+        print(f"{len(df)} items after dropping articles with NaNs")
     if drop_duplicates:
         print("Dropping duplicates by main text contents")
         df = df.drop_duplicates(subset='text')
@@ -96,17 +98,41 @@ def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, 
     if dt is True:
         def to_datetime(this_df):
             this_df['date'] = pd.to_datetime(this_df['date'])
-            this_df['date'] = this_df['date'].dt.date
             this_df['time'] = pd.to_datetime(this_df['time'])
-            this_df['time'] = this_df['time'].dt.time
             return this_df
 
         df = to_datetime(df)
     return df
 
 
-def get_pivot(p):
+def save_clean_copy(df, sp):
+    if df['text'].str.contains("<br>").any():
+        this_df_clean = df.copy()
+        this_df_clean['image_caption'] = this_df_clean['image_caption'].apply(lambda x: rm_html(x))
+        this_df_clean['text'] = this_df_clean['text'].apply(lambda x: rm_html(x))
+        this_df_clean['author_bio'] = this_df_clean['author_bio'].apply(lambda x: rm_html(x))
+        this_df_clean['category'] = this_df_clean['category'].apply(lambda x: rm_html(x))
+        new_path = sp[:sp.rfind(".")] + "_plain" + ".csv"
+        this_df_clean.to_csv(new_path, index=False)
+        print(f"Saved {len(this_df_clean)} articles without HTML tags to {new_path}")
+        return this_df_clean
+
+
+def rm_html(text):
+    return BeautifulSoup(text, "html.parser").text
+
+
+def get_pivot(p, drop_self=True, as_compatible=False):
     df = pd.read_csv(p)
+    ids = df.id.tolist()
+    if drop_self:
+        df = df.drop(columns=["id"])
+        for i in range(len(ids)):
+            df2 = df[df.columns[i]].drop(index=i)
+            df[df.columns[i]] = df2
+    df["id"] = ids
+    if as_compatible:
+        return df
     table = df.pivot_table(index='id')
     return table
 
@@ -119,8 +145,8 @@ def all_image_paths(basedir=definitions.get_paths()["imagedir"]):
 # returns: paths to images found by ids in df
 # If from_Path is set to either drive or subdir, returns a 1D dict with id-path pairs for only the main images,
 # else returns a ND dict with paths from sub directory and from drive.
-def get_id_path_pairs(df, from_path=None, save_path=None):
-    allowable_path_args = ('drive', 'subdir')
+def get_id_path_pairs(df, ignore_types=None, from_path=None, save_path=None):
+    allowable_path_args = ('drive', 'subdir', 'self')
     if from_path is not None and from_path not in allowable_path_args:
         raise ValueError(f"Bad argument {from_path}! Must be one of {allowable_path_args}")
     file_paths = all_image_paths()
@@ -131,31 +157,45 @@ def get_id_path_pairs(df, from_path=None, save_path=None):
         base_id = full_path[full_path.rfind("/") + 1:full_path.rfind("-")]
         file_id = full_path[full_path.rfind("/") + 1:full_path.rfind(".")]
         from_parent = full_path[full_path.find("sorted/") + 6:]
+        self = from_parent[from_parent.rfind("/"):]
         if base_id in id_paths.keys():
             id_paths[base_id].update({  # Updates existing dictionary
                 file_id: {
                     'drive': full_path,
-                    'subdir': from_parent
+                    'subdir': from_parent,
+                    'self': self,
                 }})
         else:
             id_paths[base_id] = {  # Creates a dictionary with id as key
                 file_id: {
                     'drive': full_path,
-                    'subdir': from_parent
+                    'subdir': from_parent,
+                    'self': self,
                 }}
+
+    def not_of_type(f):
+        if ignore_types is not None:
+            return not f[from_path].lower().endswith(ignore_types)
+        return True
 
     filtered_id_path = {}
     if from_path is not None:
         n = 0
+        gif = 0
         for article_id in article_ids:
             try:
                 p = id_paths[article_id][article_id + "-0"]
-                filtered_id_path[article_id] = p[from_path]
+                if not_of_type(p):
+                    filtered_id_path[article_id] = p[from_path]
+                else:
+                    gif += 1
             except KeyError:
                 n += 1
         if n > 0:
             print(f"{n} articles have no main image! If passed DataFrame contains no NaNs, "
                   f"then the referred images are likely unavailable or corrupt, and were previously removed.")
+        if gif > 0:
+            print(f"{gif} articles' main image were of GIF format. These were ignored.")
         else:
             print("All articles in the passed DataFrame have a corresponding main image.")
     else:
@@ -181,5 +221,11 @@ def get_out_file(source_path):
 def get_for_feature(p, feature):
     df = pd.read_csv(p)
     df = df.filter(["image", feature])
-    df["id"] = df["image"].apply(lambda i: i[:i.find(".")])
+    df["id"] = df["image"].apply(lambda i: i[:i.find(".") - 2])
     return df
+
+
+def create_article_files(df, dir_loc):
+    for i in range(len(df)):
+        df[i:i+1].to_csv(dir_loc + df[i:i+1].id.values[0] + ".csv", index=False)
+        sys.stdout.write("\r" + f"{i + 1}/{len(df)}")

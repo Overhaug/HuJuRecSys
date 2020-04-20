@@ -6,14 +6,14 @@ import common
 FEATURE = "author_bio"
 
 
-def bio_tfidf_cosine_sim(sp, df, db):
+def bio_tfidf_cosine_sim(sp, df):
     vectors = common.tfidf(df, FEATURE)
-    common.cosine_similarity(sp, df, vectors, db)
+    common.cosine_similarity(sp, df, vectors)
 
 
-def bio_levenshtein(sp, df, db):
-    common.levenshtein(sp, df, FEATURE, db)
+def bio_levenshtein(sp, df):
+    common.levenshtein(sp, df, FEATURE)
 
 
-def bio_jaccard(sp, df, db):
-    common.jaccard(sp, df, FEATURE, db)
+def bio_jaccard(sp, df):
+    common.jaccard(sp, df, FEATURE)

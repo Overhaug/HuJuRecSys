@@ -2,13 +2,13 @@
 """
     A module that creates samples from TWPC
 """
-import os
 import sys
-from datetime import timedelta, date, datetime
+from datetime import timedelta, date
 
+import numpy as np
 import pandas as pd
-from bs4 import BeautifulSoup
 
+import utils
 from utils import get_id_path_pairs
 
 years = (2012, 2013, 2014, 2015, 2016, 2017)
@@ -39,15 +39,8 @@ def sample_frac_per_day(df, frac=10):
 
 
 def sample_stratified_per_year(df, sp, n):
-    timestamp = datetime.now()
-    ts_string = timestamp.strftime("%d-%m-%Y-%H-%M")
-    sp = sp + ts_string
-    session = sp[:sp.rfind("/")]
-    if os.path.exists(session):
-        raise OSError(f"Session {session} exists")
-    os.mkdir(session)
-    print(f"Sampling {n} articles per year in {years}'")
-    final = pd.DataFrame()
+    print(f"Sampling {n} articles per year in {years}")
+    samples = pd.DataFrame()
     file_paths = get_id_path_pairs(df, from_path="drive")
     file_paths = list(file_paths.keys())
     for y in years:
@@ -55,34 +48,57 @@ def sample_stratified_per_year(df, sp, n):
         sys.stdout.write("\r" + f"Year {y}: {len(y_df)}")
         y_df = y_df[y_df.id.isin(file_paths)]
         sample = y_df.sample(n)
-        final = pd.concat([final, sample])
+        samples = pd.concat([samples, sample])
 
-    save_as_csv(final, sp)
-    print(f"Saved {len(final)} articles to {sp}")
+    cols = df["id"]
+    samples.drop(labels=["id"], axis=1, inplace=True)
+    samples.insert(0, "id", cols)
+    samples = samples.drop(["article_url", "type", "category", "subcategory", "subtype", "image_url"], axis=1)
+    images = get_id_path_pairs(df, from_path="self")
+    img = pd.DataFrame({'id': list(images.keys()), 'image': list(images.values())})
+    samples["image"] = img["image"].where(img["id"] == df["id"])
 
-    def clean_current_sample(this_df):
-        if this_df['text'].str.contains("<br>").any():
-            this_df_clean = this_df.copy()
-            this_df_clean['image_caption'] = this_df_clean['image_caption'].apply(lambda x: rm_html(x))
-            this_df_clean['text'] = this_df_clean['text'].apply(lambda x: rm_html(x))
-            this_df_clean['author_bio'] = this_df_clean['author_bio'].apply(lambda x: rm_html(x))
-            this_df_clean['category'] = this_df_clean['category'].apply(lambda x: rm_html(x))
-            new_path = sp[:sp.rfind(".")] + "_plain" + ".csv"
-            save_as_csv(this_df_clean, new_path)
-            print(f"Saved {len(this_df_clean)} articles without HTML tags to {new_path}")
-            return this_df_clean
+    final_clean = utils.save_clean_copy(samples, sp)  # We save a clean copy here since it is unnecessary to store DT
 
-    final_clean = clean_current_sample(this_df=final)
-    get_id_path_pairs(final, save_path="E:/data/id_path.csv", from_path="drive")
+    samples["date"] = samples["date"].apply(lambda t: t.date().strftime(format="%Y-%m-%d"))
+    samples["time"] = samples["time"].apply(lambda t: t.time().strftime(format="%H:%M:%S"))
+    samples["datetime"] = pd.to_datetime(samples["date"] + " " + samples["time"])
+    save_as_csv(samples, sp)
+    print(f"Saved {len(samples)} articles to {sp}")
+    get_id_path_pairs(samples, save_path="E:/data/id_path.csv", from_path="drive")
     if final_clean is not None:
-        return final, final_clean
+        return samples, final_clean
     else:
-        return final
+        return samples
+
+
+def sample_from_quantiles(data, n: int, only_ids: bool, sp: str):
+    lower_quantile = data.loc[(data.quantiles == 0) & (data.score != np.nan)]
+    lower_sample = lower_quantile.sample(n)
+
+    middle_quantile = data.loc[(data.quantiles >= 1) & (data.quantiles <= 8) & (data.score != np.nan)]
+    middle_sample = middle_quantile.sample(n)
+
+    upper_quantile = data.loc[(data.quantiles == 9) & (data.score != np.nan)]
+    upper_sample = upper_quantile.sample(n)
+
+    merged_samples = pd.concat([lower_sample, middle_sample, upper_sample])
+    # result = add_file_extension(merged_samples, ".csv")
+
+    if only_ids:
+        merged_samples.drop(["score", "quantiles"], axis=1, inplace=True)
+
+    merged_samples.to_csv(sp, index=False, sep="\t")
+
+
+def add_file_extension(data, extension):
+    data["first"] = data["first"].apply(lambda i: i + extension)
+    data["second"] = data["second"].apply(lambda i: i + extension)
+    return data
 
 
 def save_as_csv(df, path):
-    df.to_csv(path, sep=',', index=False, header=True, mode='w')
+    df.to_csv(path, sep='\t', index=False, header=True, mode='w')
 
 
-def rm_html(text):
-    return BeautifulSoup(text, "html.parser").text
+sample_stratified_per_year(utils.get_df("D:/Progs/htdocs/news-study/data_new.csv", dt=True), "D:/Progs/htdocs/news-study/data_new.csv", 400)
