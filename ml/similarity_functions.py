@@ -139,14 +139,12 @@ if __name__ == '__main__':
     sf = SESSION + "new_plain.csv"
     df = utils.get_df(sf, drop_nans=False, dt=True)
     metrics = {
-        # TITLE: ["lev", "jw", "lcs", "ngram", "lda"],
-        # TEXT: ["tfidf", "subjectivity", "sentiment", "lda", "tfidf_constr"],
-        # IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
-        # AUTHOR_BIO: ["lev", "tfidf", "jaccard"],
-        # TIME: ["exp_decay"],
-        IMAGE: ["sharpness", "shannon", "brightness", "colorfulness", "contrast"],
-        AUTHOR_BIO: ["lev"],
-        TIME: ["exp_decay"]
+        TITLE: ["lev", "jw", "lcs", "ngram", "lda"],
+        TEXT: ["tfidf", "subjectivity", "sentiment", "lda", "tfidf_constr"],
+        IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
+        AUTHOR_BIO: ["lev", "tfidf", "jaccard"],
+        TIME: ["exp_decay"],
+
     }
     compute(update=True)
     # mean_scores()
