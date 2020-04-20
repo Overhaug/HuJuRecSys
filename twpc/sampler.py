@@ -101,4 +101,4 @@ def save_as_csv(df, path):
     df.to_csv(path, sep='\t', index=False, header=True, mode='w')
 
 
-sample_stratified_per_year(utils.get_df("D:/Progs/htdocs/news-study/data_new.csv", dt=True), "D:/Progs/htdocs/news-study/data_new.csv", 400)
+# sample_stratified_per_year(utils.get_df("D:/Progs/htdocs/news-study/data_new.csv", dt=True), "D:/Progs/htdocs/news-study/data_new.csv", 400)

@@ -47,17 +47,13 @@ def cosine_similarity(sp, df, vectors):
         return scores
 
     result = cs_for_pivot()
-    # print()
-    # save_scores(result, sp=sp, db=db)
-    return result
-    # print("_" * 100)
+    save_as_pivot(result, sp=sp)
 
 
 def tfidf(df, feature):
     print(f"Computing TFIDF on {feature}")
     print("Performing stopwords removal and stemming")
     df_copy = df.copy()
-    # df_copy[feature] = df_copy[feature].apply(lambda x: x.split())
     df_copy[feature] = stemming_and_stopwords(df_copy[feature])
     print("Performing vectorization")
     return TfidfVectorizer().fit_transform(df_copy[feature])
@@ -91,7 +87,6 @@ def levenshtein(sp, df, feature):
 
     result = for_pivot(text, df, normalized_levenshtein)
     save_as_pivot(result, sp=sp)
-    print("_" * 100)
 
 
 def jaro_winkler(sp, df, feature):
@@ -100,7 +95,6 @@ def jaro_winkler(sp, df, feature):
 
     result = for_pivot(text, df, get_jaro_distance)
     save_as_pivot(result, sp=sp)
-    print("_" * 100)
 
 
 def jaccard(sp, df, feature):
@@ -116,7 +110,6 @@ def jaccard(sp, df, feature):
 
     result = for_pivot(text, df, compute)
     save_as_pivot(result, sp=sp)
-    print("_" * 100)
 
 
 def longest_common_subsequence(sp, df, feature):
@@ -130,8 +123,6 @@ def longest_common_subsequence(sp, df, feature):
 
     results = for_pivot(text, df, compute_normalized)
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
-    return
 
 
 def week_distance(sp, df, feature):
@@ -146,17 +137,10 @@ def week_distance(sp, df, feature):
         s2 = s2.weekofyear
         largest = max(s1, s2)
         smallest = min(s1, s2)
-        td = largest - smallest
-        factor = 1 / 1.2
-        try:
-            weight = 1.0 * (factor ** math.sqrt(td))
-        except ZeroDivisionError:
-            weight = 1.0
         return smallest / largest
 
     results = for_pivot(df["datetime"], df, compute)
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def concat_date_time(df):
@@ -184,7 +168,6 @@ def exp_time_decay(sp, df):
 
     results = for_pivot(df["datetime"], df, compute)
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def textblob_scores(sp, df, feature, score_type: tuple):
@@ -208,7 +191,6 @@ def textblob_scores(sp, df, feature, score_type: tuple):
 
     results = for_dataframe(text, df, score_type[1], feature, func)
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def n_gram(sp, df, feature, n):
@@ -220,11 +202,10 @@ def n_gram(sp, df, feature, n):
 
     results = for_pivot(titles, df, compute)
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def normalize_and_calculate_distance(f1, f2):
-    return 1 - float(max(f1, f2) - min(f1, f2)) / float(max(f1, f2))
+    return 1 - math.fabs(float(max(f1, f2) - min(f1, f2)) / float(max(f1, f2)))
 
 
 def calculate_distance(f1, f2):
@@ -243,7 +224,6 @@ def compute_distance(df, sp, feature, normalize):
     results = for_pivot(measures[feature], measures, func)
     print()
     save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def for_pivot(data, df, func):
@@ -291,3 +271,4 @@ def save_as_pivot(scores, sp):
     scores = scores.pivot_table(index="id")
     scores.to_csv(sp)
     print(f"Saved scores to {sp}")
+    print("_" * 100)

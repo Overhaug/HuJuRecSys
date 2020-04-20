@@ -3,12 +3,8 @@
 """
     A module for computing item similarity across n-length set of documents and image feature vectors
 """
-import sys
-
-import pandas as pd
 
 import author_similarity
-import common
 from definitions import get_paths
 from twpc import utils
 from wrappers import bio_similarity, text_similarity, title_similarity, image_similarity, time_similarity
@@ -23,48 +19,6 @@ DATE = "date"
 IMAGE_FEATURE_COLLECTION = "openimaj-images.csv"
 
 
-def load_scores():
-    scores = [utils.get_pivot(SESSION + "title-levenshtein.csv"),
-              utils.get_pivot(SESSION + "title-jarowinkler.csv"),
-              utils.get_pivot(SESSION + "title-lcs.csv"),
-              utils.get_pivot(SESSION + "ngram-lcs.csv"),
-              utils.get_pivot(SESSION + "text-subjectivity-sim.csv"),
-              utils.get_pivot(SESSION + "text-sentiment-sim.csv"),
-              utils.get_pivot(SESSION + "text-lda.csv"),
-              utils.get_pivot(SESSION + "sharpness-sim.csv"),
-              utils.get_pivot(SESSION + "shannon-sim.csv"),
-              utils.get_pivot(SESSION + "brightness-sim.csv"),
-              utils.get_pivot(SESSION + "colorfulness-sim.csv"),
-              utils.get_pivot(SESSION + "contrast-sim.csv"),
-              utils.get_pivot(SESSION + "bio-jaccard.csv"),
-              utils.get_pivot(SESSION + "bio-levenshtein.csv"),
-              # utils.get_pivot(SESSION + "week-similarity.csv"),
-              utils.get_pivot(SESSION + "exp-decay.csv")
-              ]
-    return scores
-
-
-def mean_scores():
-    scores = load_scores()
-    scores = pd.concat(scores)
-    new_scores = pd.DataFrame(columns=["first", "second", "score"])
-    ids = scores.columns
-    by_row = scores.groupby(scores.index)
-    df_means = by_row.mean()
-    scores_length = len(df_means)
-    for i, column in enumerate(df_means.columns.values):
-        temp = pd.DataFrame()
-        temp["first"] = [column for _ in range(scores_length)]
-        temp["second"] = ids
-        temp["score"] = df_means[column].values
-        new_scores = pd.concat([new_scores, temp])
-        sys.stdout.write("\r" + f"{i + 1}/{scores_length}")
-    sp = SESSION + "mean-scores.csv"
-    new_scores.to_csv(sp, index=False)
-    print("Saved mean scores")
-    return df_means
-
-
 def compute(update):
     print(f"Computing similarity for:")
     for i, v in metrics.items():
@@ -77,7 +31,7 @@ def compute(update):
         if "lcs" in metrics[TITLE]:
             title_similarity.title_lcs(SESSION + "title-lcs.csv", df)
         if "ngram" in metrics[TITLE]:
-            title_similarity.title_ngram(SESSION + "ngram-lcs.csv", df, n=2)
+            title_similarity.title_ngram(SESSION + "title-ngram.csv", df, n=2)
         if "lda" in metrics[TITLE]:
             title_similarity.title_lda(SESSION + "title-lda.csv", df, SESSION, update)
     if TEXT in metrics:
@@ -95,7 +49,6 @@ def compute(update):
             text_similarity.text_lda(SESSION + "text-lda.csv", df, SESSION, update)
     if IMAGE in metrics:
         if "emb" in metrics[IMAGE]:
-
             image_similarity.embeddings_cosine_sim(SESSION + "VGG16-embeddings.out",
                                                    SESSION + "embeddings-cs.csv", df)
         image_similarity.preload(SESSION + "resized_images")  # Pre-load images for faster computation.
@@ -124,7 +77,7 @@ def compute(update):
         if "jaccard" in metrics[AUTHOR]:
             author_similarity.author_jaccard(SESSION + "author-jaccard.csv", df)
     if TIME in metrics:
-        if "week" in metrics[TIME]:
+        if "week" in metrics[TIME]:  # Only a test - probably not going to use
             time_similarity.time_week_distance(SESSION + "week-similarity.csv", df)
         if "exp_decay" in metrics[TIME]:
             time_similarity.time_exp_decay(SESSION + "exp-decay.csv", df)
@@ -139,12 +92,12 @@ if __name__ == '__main__':
     sf = SESSION + "new_plain.csv"
     df = utils.get_df(sf, drop_nans=False, dt=True)
     metrics = {
-        TITLE: ["lev", "jw", "lcs", "ngram", "lda"],
-        TEXT: ["tfidf", "subjectivity", "sentiment", "lda", "tfidf_constr"],
+        TITLE: ["lda", "lev", "jw", "lcs", "ngram"],
+        TEXT: ["tfidf", "tfidf_constr", "subjectivity", "sentiment", "lda"],
         IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
-        AUTHOR_BIO: ["lev", "tfidf", "jaccard"],
+        AUTHOR_BIO: ["tfidf", "lev", "jaccard"],
+        AUTHOR: ["jaccard"],
         TIME: ["exp_decay"],
-
     }
     compute(update=True)
     # mean_scores()

@@ -63,10 +63,7 @@ def cs_lda(sp, df, feature, session, update_model):
         sims = index[vec_lda]
         return sims
 
-    if db:
-        results = for_db(df[feature], df, compute)
-    else:
-        results = for_pivot(df[feature], df, compute)
+    results = for_pivot(df[feature], df, compute)
     print()
     common.save_as_pivot(results, sp=sp)
     print("_" * 100)
