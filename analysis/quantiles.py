@@ -25,4 +25,4 @@ if __name__ == '__main__':
     as_vertical()
     q = pd.read_csv(SESSION + "score-quantiles.csv")
 
-    sampler.sample_from_quantiles(data=q, n=2000, only_ids=True, sp=SESSION + "2000-quantile-sample.csv")
+    sampler.sample_from_quantiles(data=q, n=2000, sep_scores=True, sp=SESSION + "2000-quantile-sample.csv")

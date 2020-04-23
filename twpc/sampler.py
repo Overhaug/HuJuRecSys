@@ -72,7 +72,7 @@ def sample_stratified_per_year(df, sp, n):
         return samples
 
 
-def sample_from_quantiles(data, n: int, only_ids: bool, sp: str):
+def sample_from_quantiles(data, n: int, sep_scores: bool, sp: str):
     lower_quantile = data.loc[(data.quantiles == 0) & (data.score != np.nan)]
     lower_sample = lower_quantile.sample(n)
 
@@ -85,7 +85,9 @@ def sample_from_quantiles(data, n: int, only_ids: bool, sp: str):
     merged_samples = pd.concat([lower_sample, middle_sample, upper_sample])
     # result = add_file_extension(merged_samples, ".csv")
 
-    if only_ids:
+    if sep_scores:
+        sp2 = sp[:sp.rfind(".")] + "-with-scores.csv"
+        merged_samples.to_csv(sp2, index=False, sep="\t")
         merged_samples.drop(["score", "quantiles"], axis=1, inplace=True)
 
     merged_samples.to_csv(sp, index=False, sep="\t")

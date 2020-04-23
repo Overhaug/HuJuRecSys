@@ -79,6 +79,8 @@ def compute(update):
     if TIME in metrics:
         if "week" in metrics[TIME]:  # Only a test - probably not going to use
             time_similarity.time_week_distance(SESSION + "week-similarity.csv", df)
+        if "days" in metrics[TIME]:
+            time_similarity.time_days_distance(SESSION + "days-distance-similarity.csv", df)
         if "exp_decay" in metrics[TIME]:
             time_similarity.time_exp_decay(SESSION + "exp-decay.csv", df)
 
@@ -97,7 +99,6 @@ if __name__ == '__main__':
         IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
         AUTHOR_BIO: ["tfidf", "lev", "jaccard"],
         AUTHOR: ["jaccard"],
-        TIME: ["exp_decay"],
+        TIME: ["exp_decay", "days"],
     }
     compute(update=True)
-    # mean_scores()

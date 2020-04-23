@@ -5,6 +5,7 @@
 """
 import math
 import sys
+from datetime import date, datetime
 
 import pandas as pd
 import pylcs
@@ -20,7 +21,7 @@ from textblob import TextBlob
 
 import utils
 
-DATE_IS_STRINGIFIED = False
+DATE_IS_CONCATENATED = False
 
 
 def cosine_similarity(sp, df, vectors):
@@ -144,11 +145,11 @@ def week_distance(sp, df, feature):
 
 
 def concat_date_time(df):
-    global DATE_IS_STRINGIFIED
-    if not DATE_IS_STRINGIFIED:
+    global DATE_IS_CONCATENATED
+    if not DATE_IS_CONCATENATED:
         df["date"] = df["date"].apply(lambda t: t.date().strftime(format="%Y-%m-%d"))
         df["time"] = df["time"].apply(lambda t: t.time().strftime(format="%H:%M:%S"))
-        DATE_IS_STRINGIFIED = True
+        DATE_IS_CONCATENATED = True
     return pd.to_datetime(df["date"] + " " + df["time"])
 
 
@@ -165,6 +166,17 @@ def exp_time_decay(sp, df):
         td = largest - smallest
         factor = 0.95
         return 1.0 * (factor ** math.sqrt(td.days))
+
+    results = for_pivot(df["datetime"], df, compute)
+    save_as_pivot(results, sp=sp)
+
+
+def days_distance(sp, df):
+    print(f"Computing days distance similarity")
+    df["datetime"] = concat_date_time(df)
+
+    def compute(s1, s2):
+        return 1 - math.fabs((max(s1, s2) - min(s1, s2)).days / max(s1, s2).year)
 
     results = for_pivot(df["datetime"], df, compute)
     save_as_pivot(results, sp=sp)
