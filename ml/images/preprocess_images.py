@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Preprocesses (moves and resizes) images relevant to a sample dataset.
+"""
+
 import glob
 import os
 import threading
@@ -6,9 +12,11 @@ import numpy as np
 from PIL import Image, ImageFile
 
 import utils
-from definitions import get_paths
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+SESSION = ""
+IMAGE_SESSION = ""
 
 
 class ResizeThread(threading.Thread):
@@ -28,16 +36,21 @@ class ResizeThread(threading.Thread):
         print(f"Worker {self.worker_id} finished its batch.")
 
 
-def resize_images(files):
+def copy_and_resize_sample_images(files, target_size):
     n = 0
     threads = np.arange(1, 7, 1)
     thread_count = max(threads)
     chunk = len(files) // thread_count
     print(f"Starting {thread_count} workers")
+    workers = []
     for i in threads:
-        thread = ResizeThread(files[n:n + chunk], i, (500, 500))  # Each thread receives an equal # filepaths
+        thread = ResizeThread(files[n:n + chunk], i, target_size)  # Each thread receives an equal # filepaths
         n += chunk
+        workers.append(thread)
         thread.start()
+
+    for w in workers:
+        w.join()
 
 
 def create_image_paths(df_path, cat):
@@ -57,15 +70,15 @@ def remove_images_in_session():
         os.remove(i)
 
 
-if __name__ == '__main__':
-    ospaths = get_paths()
-    SESSION = "Sesj2"
-    SESSION = ospaths["datadir"] + SESSION + "/"
+def run(session_name, target_size):
+    print(f"Starting preprocessing of images for session {session_name}")
+    global SESSION, IMAGE_SESSION
+    SESSION = session_name
     IMAGE_SESSION = SESSION + "resized_images/"
-    # utils.get_id_path_pairs(utils.get_df(SESSION + "new.csv"), ignore_types="gif", from_path="drive",
-    # save_path=SESSION + "id_path_all.csv")
+    if not os.path.exists(IMAGE_SESSION):
+        os.mkdir(IMAGE_SESSION)
+        print(f"New directory: {IMAGE_SESSION}")
+
     f = utils.get_df(SESSION + "id_path.csv")
     f = f.path.values.tolist()
-    resize_images(f)
-    # remove_images_in_session()
-    # create_image_paths(SESSION + "politics.csv", "Politics")
+    copy_and_resize_sample_images(f, target_size)

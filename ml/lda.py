@@ -30,7 +30,7 @@ def create_model(session, df, feature):
     corpus = [doc.split() for doc in corpus]
     corpus = [dct.doc2bow(text) for text in corpus]
     dct = Dictionary.load(session + "LDA-dictionary-" + feature + ".pk1")
-    lda_model = LdaMulticore(corpus=corpus, id2word=dct, workers=5)
+    lda_model = LdaMulticore(corpus=corpus, id2word=dct, workers=5, iterations=1500, alpha=0.01)
     lda_model.save(session + "LDA-model-" + feature)
 
 
@@ -64,9 +64,7 @@ def cs_lda(sp, df, feature, session, update_model):
         return sims
 
     results = for_pivot(df[feature], df, compute)
-    print()
     common.save_as_pivot(results, sp=sp)
-    print("_" * 100)
 
 
 def get_dict(feature, session):

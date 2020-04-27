@@ -5,7 +5,6 @@
 """
 import math
 import sys
-from datetime import date, datetime
 
 import pandas as pd
 import pylcs
@@ -78,6 +77,10 @@ def constrain_length(df, feature, n):
     return df[feature].apply(lambda text: ' '.join(text.split(" ")[:n]))
 
 
+def get_lead_paragraphs(df, feature):
+    return df[feature].apply(lambda text: text[:text.find("<br><br>")])
+
+
 def levenshtein(sp, df, feature):
     print(f"Computing Levenshtein distance on {feature}")
     text = df[feature]
@@ -101,13 +104,14 @@ def jaro_winkler(sp, df, feature):
 def jaccard(sp, df, feature):
     print(f"Computing Jaccard distance on {feature}")
     text = df[feature]
+    delim = ";" if feature == "author" else " "
 
     def compute(s1, s2):
-        s1 = s1.split(" ")
-        s2 = s2.split(" ")
+        s1 = s1.split(delim)
+        s2 = s2.split(delim)
         s1 = set(filter(None, s1))
         s2 = set(filter(None, s2))
-        return jaccard_distance(s1, s2)
+        return 1 - jaccard_distance(s1, s2)
 
     result = for_pivot(text, df, compute)
     save_as_pivot(result, sp=sp)
@@ -173,7 +177,7 @@ def exp_time_decay(sp, df):
 
 def days_distance(sp, df):
     print(f"Computing days distance similarity")
-    df["datetime"] = concat_date_time(df)
+    df["datetime"] = pd.to_datetime(df["datetime"])
 
     def compute(s1, s2):
         return 1 - math.fabs((max(s1, s2) - min(s1, s2)).days / max(s1, s2).year)
@@ -188,7 +192,7 @@ def textblob_scores(sp, df, feature, score_type: tuple):
     """
     if not score_type == (0, "sentiment") and not score_type == (1, "subjectivity"):
         raise ValueError(f"arg {score_type} must be a tuple of either '0, sentiment', or '1, subjectivity'")
-    print(f"Computing {score_type[1]} on {feature}")
+    print(f"Extracting {score_type[1]} on {feature}")
     text = df[feature]
 
     def compute_normalize(s):
@@ -217,7 +221,7 @@ def n_gram(sp, df, feature, n):
 
 
 def normalize_and_calculate_distance(f1, f2):
-    return 1 - math.fabs(float(max(f1, f2) - min(f1, f2)) / float(max(f1, f2)))
+    return 1 - math.fabs(f1 - f2) / max(f1, f2)
 
 
 def calculate_distance(f1, f2):

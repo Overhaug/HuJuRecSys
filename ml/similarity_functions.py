@@ -4,10 +4,8 @@
     A module for computing item similarity across n-length set of documents and image feature vectors
 """
 
-import author_similarity
-from definitions import get_paths
-from twpc import utils
-from wrappers import bio_similarity, text_similarity, title_similarity, image_similarity, time_similarity
+from wrappers import bio_similarity, text_similarity, title_similarity, \
+    image_similarity, time_similarity, category_similarity, author_similarity
 
 TITLE = "title"
 TEXT = "text"
@@ -15,90 +13,88 @@ AUTHOR_BIO = "author_bio"
 AUTHOR = "author"
 IMAGE = "image"
 TIME = "time"
-DATE = "date"
-IMAGE_FEATURE_COLLECTION = "openimaj-images.csv"
+SUBCATEGORY = "subcategory"
+
+IMAGE_FEATURE_COLLECTION = "openimaj-images-all.csv"
+
+SIM_SESSION = ""
+metrics = {}
 
 
-def compute(update):
+def compute(df, update):
     print(f"Computing similarity for:")
     for i, v in metrics.items():
         print(f"{i}:", ', '.join(v))
     if TITLE in metrics:
         if "lev" in metrics[TITLE]:
-            title_similarity.title_levenshtein(SESSION + "title-levenshtein.csv", df)
+            title_similarity.title_levenshtein(SIM_SESSION + "title-levenshtein.csv", df)
         if "jw" in metrics[TITLE]:
-            title_similarity.title_jw(SESSION + "title-jarowinkler.csv", df)
+            title_similarity.title_jw(SIM_SESSION + "title-jarowinkler.csv", df)
         if "lcs" in metrics[TITLE]:
-            title_similarity.title_lcs(SESSION + "title-lcs.csv", df)
+            title_similarity.title_lcs(SIM_SESSION + "title-lcs.csv", df)
         if "ngram" in metrics[TITLE]:
-            title_similarity.title_ngram(SESSION + "title-ngram.csv", df, n=2)
+            title_similarity.title_ngram(SIM_SESSION + "title-ngram.csv", df, n=2)
         if "lda" in metrics[TITLE]:
-            title_similarity.title_lda(SESSION + "title-lda.csv", df, SESSION, update)
+            title_similarity.title_lda(SIM_SESSION + "title-lda.csv", df, SIM_SESSION, update)
     if TEXT in metrics:
         if "tfidf" in metrics[TEXT]:
-            text_similarity.text_tfidf_cosine_sim(SESSION + "text-tfidf-cs.csv", df)
+            text_similarity.text_tfidf_cosine_sim(SIM_SESSION + "text-tfidf-cs.csv", df)
         if "tfidf_constr" in metrics[TEXT]:
-            text_similarity.text_tfidf_cosine_sim_length_constrained(SESSION + "text-tfidf-cs-constr.csv", df, 400)
+            text_similarity.text_tfidf_cosine_sim_length_constrained(SIM_SESSION + "text-tfidf-cs-constr.csv", df, 50)
         if "subjectivity" in metrics[TEXT]:
-            text_similarity.text_textblob(SESSION + "text-subjectivity.csv",
-                                          SESSION + "text-subjectivity-sim.csv", df, (1, "subjectivity"), update)
+            text_similarity.text_textblob(SIM_SESSION + "text-subjectivity.csv",
+                                          SIM_SESSION + "text-subjectivity-sim.csv", df, (1, "subjectivity"), update)
         if "sentiment" in metrics[TEXT]:
-            text_similarity.text_textblob(SESSION + "text-sentiment.csv",
-                                          SESSION + "text-sentiment-sim.csv", df, (0, "sentiment"), update)
+            text_similarity.text_textblob(SIM_SESSION + "text-sentiment.csv",
+                                          SIM_SESSION + "text-sentiment-sim.csv", df, (0, "sentiment"), update)
         if "lda" in metrics[TEXT]:
-            text_similarity.text_lda(SESSION + "text-lda.csv", df, SESSION, update)
+            text_similarity.text_lda(SIM_SESSION + "text-lda.csv", df, SIM_SESSION, update)
     if IMAGE in metrics:
         if "emb" in metrics[IMAGE]:
-            image_similarity.embeddings_cosine_sim(SESSION + "VGG16-embeddings.out",
-                                                   SESSION + "embeddings-cs.csv", df)
-        image_similarity.preload(SESSION + "resized_images")  # Pre-load images for faster computation.
+            image_similarity.embeddings_cosine_sim(SIM_SESSION + "VGG16-embeddings.out",
+                                                   SIM_SESSION + "embeddings-cs.csv", df)
+        if "entropy" in metrics[IMAGE]:
+            image_similarity.image_calculate_computed_metrics(SIM_SESSION + IMAGE_FEATURE_COLLECTION,
+                                                              SIM_SESSION + "entropy-sim.csv", "entropy", True)
         if "sharpness" in metrics[IMAGE]:
-            image_similarity.image_sharpness(SESSION + "sharpness.csv", SESSION + "sharpness-sim.csv", df, update)
-        if "shannon" in metrics[IMAGE]:
-            image_similarity.image_shannon(SESSION + "shannon.csv", SESSION + "shannon-sim.csv", df, update)
-        image_similarity.clear()  # Free up memory
+            image_similarity.image_calculate_computed_metrics(SIM_SESSION + IMAGE_FEATURE_COLLECTION,
+                                                              SIM_SESSION + "sharpness-sim.csv", "sharpness", True)
         if "brightness" in metrics[IMAGE]:
-            image_similarity.image_calculate_computed_metrics(SESSION + IMAGE_FEATURE_COLLECTION,
-                                                              SESSION + "brightness-sim.csv", "brightness")
+            image_similarity.image_calculate_computed_metrics(SIM_SESSION + IMAGE_FEATURE_COLLECTION,
+                                                              SIM_SESSION + "brightness-sim.csv", "brightness", False)
         if "colorfulness" in metrics[IMAGE]:
-            image_similarity.image_calculate_computed_metrics(SESSION + IMAGE_FEATURE_COLLECTION,
-                                                              SESSION + "colorfulness-sim.csv", "colorfulness")
+            image_similarity.image_calculate_computed_metrics(SIM_SESSION + IMAGE_FEATURE_COLLECTION,
+                                                              SIM_SESSION + "colorfulness-sim.csv", "colorfulness",
+                                                              False)
         if "contrast" in metrics[IMAGE]:
-            image_similarity.image_calculate_computed_metrics(SESSION + IMAGE_FEATURE_COLLECTION,
-                                                              SESSION + "contrast-sim.csv", "contrast")
+            image_similarity.image_calculate_computed_metrics(SIM_SESSION + IMAGE_FEATURE_COLLECTION,
+                                                              SIM_SESSION + "contrast-sim.csv", "contrast", False)
     if AUTHOR_BIO in metrics:
         if "tfidf" in metrics[AUTHOR_BIO]:
-            bio_similarity.bio_tfidf_cosine_sim(SESSION + "bio-tfidf-cs.csv", df)
-        if "jaccard" in metrics[AUTHOR_BIO]:
-            bio_similarity.bio_jaccard(SESSION + "bio-jaccard.csv", df)
-        if "lev" in metrics[AUTHOR_BIO]:
-            bio_similarity.bio_levenshtein(SESSION + "bio-levenshtein.csv", df)
+            bio_similarity.bio_tfidf_cosine_sim(SIM_SESSION + "bio-tfidf-cs.csv", df)
+        if "lda" in metrics[AUTHOR_BIO]:
+            bio_similarity.bio_lda(SIM_SESSION + "bio-lda.csv", df, SIM_SESSION, update)
     if AUTHOR in metrics:
         if "jaccard" in metrics[AUTHOR]:
-            author_similarity.author_jaccard(SESSION + "author-jaccard.csv", df)
+            author_similarity.author_jaccard(SIM_SESSION + "author-jaccard.csv", df)
     if TIME in metrics:
-        if "week" in metrics[TIME]:  # Only a test - probably not going to use
-            time_similarity.time_week_distance(SESSION + "week-similarity.csv", df)
         if "days" in metrics[TIME]:
-            time_similarity.time_days_distance(SESSION + "days-distance-similarity.csv", df)
-        if "exp_decay" in metrics[TIME]:
-            time_similarity.time_exp_decay(SESSION + "exp-decay.csv", df)
+            time_similarity.time_days_distance(SIM_SESSION + "days-distance-similarity.csv", df)
+    if SUBCATEGORY in metrics:
+        if "jacc" in metrics[SUBCATEGORY]:
+            category_similarity.subcategory_jacc(SIM_SESSION + "category-jaccard.csv", df)
 
 
-if __name__ == '__main__':
-    ospaths = get_paths()
-    SESSION = "Sesj2"
-    SESSION = ospaths["datadir"] + SESSION + "/"
-    print(f"Session directory: {SESSION}")
-    # sf = SESSION + "sample_Politics_400_plain.csv"
-    sf = SESSION + "new_plain.csv"
-    df = utils.get_df(sf, drop_nans=False, dt=True)
+def run(session_name, data):
+    global SIM_SESSION, metrics
+    SIM_SESSION = session_name
     metrics = {
-        TITLE: ["lda", "lev", "jw", "lcs", "ngram"],
-        TEXT: ["tfidf", "tfidf_constr", "subjectivity", "sentiment", "lda"],
-        IMAGE: ["emb", "sharpness", "shannon", "brightness", "colorfulness", "contrast"],
-        AUTHOR_BIO: ["tfidf", "lev", "jaccard"],
+        TITLE: ["lev", "jw", "lcs", "ngram", "lda"],
+        TEXT: ["tfidf", "tfidf_constr", "sentiment", "lda"],
+        IMAGE: ["entropy", "sharpness", "brightness", "colorfulness", "contrast"],
+        AUTHOR_BIO: ["tfidf", "lda"],
         AUTHOR: ["jaccard"],
-        TIME: ["exp_decay", "days"],
+        TIME: ["days"],
+        SUBCATEGORY: ["jacc"]
     }
-    compute(update=True)
+    compute(data, update=True)

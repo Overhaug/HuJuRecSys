@@ -28,9 +28,7 @@ categories = {
         "Post Politics",
         "Think Tanked",
         "PowerPost",
-        "Post Politics Live",
-        "Washington Post Live",
-        "Post Live",
+        "Jennifer Rubin",
     ],
     "Opinions": [
         "Opinions",
@@ -45,7 +43,6 @@ categories = {
         "Post Opinión",
         "Post Opinion",
         "Alexandra Petri",
-        "Jennifer Rubin",
         "Telnaes Cartoons",
         "Toles Cartoons",
         "Erik Wemple",
@@ -180,6 +177,7 @@ categories = {
         "Fiscal Cliff",
         "Keystone Highway",
         "World Business",
+        "Wonkblog",
     ],
     "Personal Finance": [
         "Personal Finance",
@@ -372,6 +370,11 @@ categories = {
         "True Crime",
         "Crime",
     ],
+    "Video": [
+        "Post Politics Live",
+        "Washington Post Live",
+        "Post Live",
+    ]
 }
 
 

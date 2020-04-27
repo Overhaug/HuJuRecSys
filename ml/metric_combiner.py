@@ -2,36 +2,37 @@
 # -*- coding: utf-8 -*-
 """
     A module for combing various similarity metrics
+    Filenames are hard-coded because similarity metrics are always created with the same filename.
+    The only change is the SESSION variable
 """
 import sys
 
 import pandas as pd
 
 import utils
-from definitions import get_paths
+
+SESSION = ""
+
+
+# todo: create a definitions module to universify filenames. Can then be used from any module to grab any file
 
 
 def mean_scores(metrics):
     data = []
-    if "all" in metrics:
+    if "title" in metrics:
         data += all_title()
-        data += all_image()
+    if "text" in metrics:
         data += all_text()
-        data += all_time()
+    if "author" in metrics:
         data += all_author()
+    if "author_bio" in metrics:
         data += all_authorbio()
-    elif "title" in metrics:
-        data += all_title()
-    elif "text" in metrics:
-        data += all_text()
-    elif "author" in metrics:
-        data += all_author()
-    elif "authorbio" in metrics:
-        data += all_authorbio()
-    elif "image" in metrics:
+    if "image" in metrics:
         data += all_image()
-    elif "time" in metrics:
+    if "time" in metrics:
         data += all_time()
+    if "subcategory" in metrics:
+        data += all_category()
 
     all_scores = pd.concat(data)
     formatted_scores = pd.DataFrame(columns=["first", "second", "score"])
@@ -48,7 +49,7 @@ def mean_scores(metrics):
         sys.stdout.write("\r" + f"{i + 1}/{scores_length}")
     sp = SESSION + "mean-scores.csv"
     formatted_scores.to_csv(sp, index=False)
-    print("Saved mean scores")
+    print(" \n Saved mean scores")
 
 
 def all_title():
@@ -60,8 +61,7 @@ def all_title():
 
 
 def all_text():
-    return [utils.get_pivot(SESSION + "text-subjectivity-sim.csv"),
-            utils.get_pivot(SESSION + "text-sentiment-sim.csv"),
+    return [utils.get_pivot(SESSION + "text-sentiment-sim.csv"),
             utils.get_pivot(SESSION + "text-lda.csv"),
             utils.get_pivot(SESSION + "text-tfidf-cs.csv"),
             utils.get_pivot(SESSION + "text-tfidf-cs-constr.csv")]
@@ -69,16 +69,16 @@ def all_text():
 
 def all_image():
     return [utils.get_pivot(SESSION + "sharpness-sim.csv"),
-            utils.get_pivot(SESSION + "shannon-sim.csv"),
+            utils.get_pivot(SESSION + "entropy-sim.csv"),
             utils.get_pivot(SESSION + "brightness-sim.csv"),
             utils.get_pivot(SESSION + "colorfulness-sim.csv"),
-            utils.get_pivot(SESSION + "contrast-sim.csv")]
+            utils.get_pivot(SESSION + "contrast-sim.csv"),
+            utils.get_pivot(SESSION + "embeddings-cs.csv")]
 
 
 def all_authorbio():
-    return [utils.get_pivot(SESSION + "bio-jaccard.csv"),
-            utils.get_pivot(SESSION + "bio-levenshtein.csv"),
-            utils.get_pivot(SESSION + "bio-tfidf-cs.csv")]
+    return [utils.get_pivot(SESSION + "bio-tfidf-cs.csv"),
+            utils.get_pivot(SESSION + "bio-lda.csv")]
 
 
 def all_author():
@@ -86,11 +86,16 @@ def all_author():
 
 
 def all_time():
-    return [utils.get_pivot(SESSION + "exp-decay.csv")]
+    return [  # utils.get_pivot(SESSION + "exp-decay.csv"),
+        utils.get_pivot(SESSION + "days-distance-similarity.csv")]
 
 
-ospaths = get_paths()
-SESSION = "Sesj2"
-SESSION = ospaths["datadir"] + SESSION + "/"
-print(f"Session directory: {SESSION}")
-mean_scores(["all"])
+def all_category():
+    return [utils.get_pivot(SESSION + "category-jaccard.csv")]
+
+
+def run(session_name, combination):
+    print(f"Combining metrics '{combination}'")
+    global SESSION
+    SESSION = session_name
+    mean_scores(combination)

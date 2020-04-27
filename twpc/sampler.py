@@ -2,14 +2,16 @@
 """
     A module that creates samples from TWPC
 """
-import sys
 from datetime import timedelta, date
 
 import numpy as np
 import pandas as pd
+from PIL import Image, ImageFile
 
 import utils
 from utils import get_id_path_pairs
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 years = (2012, 2013, 2014, 2015, 2016, 2017)
 
@@ -38,41 +40,99 @@ def sample_frac_per_day(df, frac=10):
     save_as_csv(new_df, 'D:/newsRecSys/data/sample.csv')
 
 
-def sample_stratified_per_year(df, sp, n):
+def is_placeholder(i):
+    im = Image.open(i)
+    return im.height == 100 and im.width == 145
+
+
+def sample_n_per_year(df, sp, n):
+    """
+    Samples n articles per year as defined by variable years.
+    Makes sure no articles sampled have a main image believed to be a placeholder image.
+    Ensures that all articles have a main image, and never of type .GIF
+    Finds and adds the filename of each image to each article
+    :param df: pandas DataFrame to sample from
+    :param sp: save path
+    :param n: how many articles per year
+    :return: a clean version of the resulting sample dataset
+    """
     print(f"Sampling {n} articles per year in {years}")
+    file_paths = get_id_path_pairs(df, from_path="drive", ignore_types="gif")
+    file_path_ids = list(file_paths.keys())
+
+    def sample_ignore_placeholders(source, result, x, recurse=False):
+        """
+        A function to sample x number of samples while ignoring articles with placeholder images.
+        If a sample-set contains articles with placeholder images, a subset of the results is carried
+        over to a new iteration of the function through recursion,
+        and finds the remaining x articles needed to reach initial x.
+        :param source: DF to sample from
+        :param result: Resulting DF without samples containing placeholders
+        :param x: The current number of articles to sample
+        :param recurse: Whether this iteration of the function is a product of recursion
+        :return: Initial x number of samples
+        """
+        source = source.reset_index(level=0, drop=True)
+        this_sample = source.sample(x)
+        source = source.drop(this_sample.index.values.tolist())  # .reset_index()
+        this_sample = this_sample.reset_index(level=0, drop=True)
+
+        placeholders = []
+        for i in this_sample.id:
+            if is_placeholder(file_paths[i]):
+                placeholders.append(this_sample.index[this_sample.id == i].tolist()[0])
+        if len(this_sample) - len(placeholders) == x or len(placeholders) == 0:
+            if recurse:
+                return pd.concat([this_sample, result])
+            return this_sample
+        else:
+            print(f"{len(placeholders)} articles had a placeholder image. Finding replacements ...")
+            this_sample = this_sample.drop(this_sample.index[placeholders])
+            this_sample = pd.concat([result, this_sample])
+            return sample_ignore_placeholders(source, this_sample, len(placeholders), True)
+
     samples = pd.DataFrame()
-    file_paths = get_id_path_pairs(df, from_path="drive")
-    file_paths = list(file_paths.keys())
     for y in years:
         y_df = df.loc[df.date.dt.year == y]
-        sys.stdout.write("\r" + f"Year {y}: {len(y_df)}")
-        y_df = y_df[y_df.id.isin(file_paths)]
-        sample = y_df.sample(n)
+        print(f"Year {y}: {len(y_df)}")
+        y_df = y_df[y_df.id.isin(file_path_ids)]
+        sample = sample_ignore_placeholders(y_df, None, n)
         samples = pd.concat([samples, sample])
 
-    cols = df["id"]
+    # Finds "self"-path for each image, i.e. from the image's directory
+    samples = samples.reset_index()
+    images = get_id_path_pairs(samples, from_path="self")
+    img = pd.DataFrame({'id': list(images.keys()), 'image': list(images.values())})
+    samples["image"] = img["image"].where(img["id"] == samples["id"])
+
+    # Simply to place the id column at colindex 0
+    cols = samples["id"]
     samples.drop(labels=["id"], axis=1, inplace=True)
     samples.insert(0, "id", cols)
-    samples = samples.drop(["article_url", "type", "category", "subcategory", "subtype", "image_url"], axis=1)
-    images = get_id_path_pairs(df, from_path="self")
-    img = pd.DataFrame({'id': list(images.keys()), 'image': list(images.values())})
-    samples["image"] = img["image"].where(img["id"] == df["id"])
 
-    final_clean = utils.save_clean_copy(samples, sp)  # We save a clean copy here since it is unnecessary to store DT
+    # Cols not needed for neither calculations nor survey
+    cols_to_drop = ["article_url", "type", "category", "subtype", "image_url", "index"]
+    samples = samples.drop(cols_to_drop, axis=1)
 
+    # Concatenate date and time to a single datetime for easier viewing on survey
     samples["date"] = samples["date"].apply(lambda t: t.date().strftime(format="%Y-%m-%d"))
     samples["time"] = samples["time"].apply(lambda t: t.time().strftime(format="%H:%M:%S"))
     samples["datetime"] = pd.to_datetime(samples["date"] + " " + samples["time"])
-    save_as_csv(samples, sp)
+
+    # Rearrange cols (hard-coded order)
+    samples = rearrange_cols(samples)
+
+    final_clean = utils.save_clean_copy(samples, sp)
+    samples.to_csv(sp, index=False, header=True, sep="\t")
     print(f"Saved {len(samples)} articles to {sp}")
-    get_id_path_pairs(samples, save_path="E:/data/id_path.csv", from_path="drive")
-    if final_clean is not None:
-        return samples, final_clean
-    else:
-        return samples
+
+    # Store a csv file with ID and path to image for each article
+    get_id_path_pairs(samples, save_path=sp[:sp.rfind("/")] + "/id_path.csv", from_path="drive")
+    return final_clean
 
 
 def sample_from_quantiles(data, n: int, sep_scores: bool, sp: str):
+    print(f"Sampling from quantiles, {n} per range")
     lower_quantile = data.loc[(data.quantiles == 0) & (data.score != np.nan)]
     lower_sample = lower_quantile.sample(n)
 
@@ -83,7 +143,6 @@ def sample_from_quantiles(data, n: int, sep_scores: bool, sp: str):
     upper_sample = upper_quantile.sample(n)
 
     merged_samples = pd.concat([lower_sample, middle_sample, upper_sample])
-    # result = add_file_extension(merged_samples, ".csv")
 
     if sep_scores:
         sp2 = sp[:sp.rfind(".")] + "-with-scores.csv"
@@ -91,6 +150,12 @@ def sample_from_quantiles(data, n: int, sep_scores: bool, sp: str):
         merged_samples.drop(["score", "quantiles"], axis=1, inplace=True)
 
     merged_samples.to_csv(sp, index=False, sep="\t")
+
+
+def rearrange_cols(df):
+    cols = ["id", "subcategory", "title", "image", "image_caption",
+            "author", "date", "time", "datetime", "text", "author_bio"]
+    return df[cols]
 
 
 def add_file_extension(data, extension):
@@ -101,6 +166,3 @@ def add_file_extension(data, extension):
 
 def save_as_csv(df, path):
     df.to_csv(path, sep='\t', index=False, header=True, mode='w')
-
-
-# sample_stratified_per_year(utils.get_df("D:/Progs/htdocs/news-study/data_new.csv", dt=True), "D:/Progs/htdocs/news-study/data_new.csv", 400)

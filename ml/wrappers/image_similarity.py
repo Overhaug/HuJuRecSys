@@ -42,9 +42,9 @@ def image_shannon(sp, sp2, df, update):
     common.compute_distance(sp, sp2, "shannon", True)
 
 
-def image_calculate_computed_metrics(sp, sp2, feature):
+def image_calculate_computed_metrics(sp, sp2, feature, normalize_feature):
     data = utils.get_for_feature(sp, feature)
-    common.compute_distance(data, sp2, feature, False)
+    common.compute_distance(data, sp2, feature, normalize_feature)
 
 
 def preload(dirpath):

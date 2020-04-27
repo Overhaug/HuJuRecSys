@@ -9,6 +9,7 @@ import glob
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -72,29 +73,49 @@ def find_nth(haystack, needle, n):
     return start
 
 
-def get_df(source, drop_nans=False, dt=False, category=None, article_type=None, drop_duplicates=False, has_image=False):
-    df = pd.read_csv(source, sep=",")
-    print(f"Loaded {len(df)} rows.")
+def drop_where_missing_bio(row):
+    num_authors = len(row.author.split(";"))
+    if num_authors == 1:
+        return row
+    num_bios = len(list(filter(None, row.author_bio.split("<br><br>"))))
+    if num_authors == num_bios:
+        return row
+    return np.nan
+
+
+def get_df(source, separator=",", drop_nans=False, dt=False, category=None, article_type=None,
+           drop_duplicates=False, has_image=False, drop_missing_bio=False, max_article_length=None):
+    df = pd.read_csv(source, sep=separator)
+    print(f"Loaded {len(df)} rows from file: {source}")
     if drop_nans:
         df = df.dropna()
-        print(f"{len(df)} items after dropping articles with NaNs")
+        print(f"{len(df)} items after dropping rows with NaNs")
     if drop_duplicates:
         print("Dropping duplicates by main text contents")
         df = df.drop_duplicates(subset='text')
-        print(f"{len(df)} articles after dropping exact duplicates by main text")
+        print(f"{len(df)} rows after dropping exact duplicates by main text")
     if article_type is not None:
         print(f"Locating articles of type {article_type}")
         df = df.loc[df.type == article_type]
-        print(f"{len(df)} articles of type {article_type}")
+        print(f"{len(df)} rows of type {article_type}")
     if category is not None:
-        print(f"Locating articles within category {category}")
+        print(f"Locating rows within category {category}")
         df = df.loc[df.category == category]
-        print(f"{len(df)} articles within category {category}")
+        print(f"{len(df)} rows within category {category}")
     if has_image:
-        print("Filtering out articles without a main image")
+        print("Filtering out rows without a main image")
         file_paths = get_id_path_pairs(df, from_path="drive")
         df = df[df.id.isin(file_paths)]
-        print(f"{len(df)} articles with a main image")
+        print(f"{len(df)} rows with a main image")
+    if drop_missing_bio:
+        print(f"Locating rows with missing author biographies")
+        df = df.apply(lambda row: drop_where_missing_bio(row), axis=1)
+        df.dropna(inplace=True)
+        print(f"{len(df)} rows without missing author biographies")
+    if max_article_length is not None:
+        print(f"Locating rows with text longer than {max_article_length}")
+        df = df[df["text"].apply(lambda x: x.split()).str.len() < max_article_length]
+        print(f"{len(df)} rows after dropping rows with text longer than {max_article_length}")
     if dt is True:
         def to_datetime(this_df):
             this_df['date'] = pd.to_datetime(this_df['date'])
@@ -111,7 +132,6 @@ def save_clean_copy(df, sp):
         this_df_clean['image_caption'] = this_df_clean['image_caption'].apply(lambda x: rm_html(x))
         this_df_clean['text'] = this_df_clean['text'].apply(lambda x: rm_html(x))
         this_df_clean['author_bio'] = this_df_clean['author_bio'].apply(lambda x: rm_html(x))
-        this_df_clean['category'] = this_df_clean['category'].apply(lambda x: rm_html(x))
         new_path = sp[:sp.rfind(".")] + "_plain" + ".csv"
         this_df_clean.to_csv(new_path, index=False)
         print(f"Saved {len(this_df_clean)} articles without HTML tags to {new_path}")
@@ -194,10 +214,10 @@ def get_id_path_pairs(df, ignore_types=None, from_path=None, save_path=None):
         if n > 0:
             print(f"{n} articles have no main image! If passed DataFrame contains no NaNs, "
                   f"then the referred images are likely unavailable or corrupt, and were previously removed.")
-        if gif > 0:
-            print(f"{gif} articles' main image were of GIF format. These were ignored.")
         else:
             print("All articles in the passed DataFrame have a corresponding main image.")
+        if gif > 0:
+            print(f"{gif} articles' main image were of GIF format. These were ignored.")
     else:
         return filtered_id_path
     # Saving only works having passed a from_Path argument
@@ -222,6 +242,7 @@ def get_for_feature(p, feature):
     df = pd.read_csv(p)
     df = df.filter(["image", feature])
     df["id"] = df["image"].apply(lambda i: i[:i.find(".") - 2])
+    df.drop("image", axis=1, inplace=True)
     return df
 
 

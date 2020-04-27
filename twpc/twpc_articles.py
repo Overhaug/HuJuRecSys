@@ -8,6 +8,7 @@ import re
 from datetime import datetime as dt
 from warnings import filterwarnings
 
+import numpy as np
 import pandas as pd
 import pytz
 from json_lines import reader as jl_reader
@@ -17,7 +18,7 @@ from twpc_helper import TWPCHelper
 from utils import options, file_len, rindex
 
 
-def main():
+def main(category=None):
     if os.path.exists(twpc_helper.save_path):
         twpc_helper.save_path = options(twpc_helper.save_path)
         print(f"New path: {twpc_helper.save_path}")
@@ -26,11 +27,19 @@ def main():
     with open(twpc_helper.source_path, "rb") as f:
         for i, article in enumerate(jl_reader(f), start=1):
             article["contents"] = list(filter(None, article["contents"]))
+            article["category"], article["subcategory"] = get_categories(article)
+            # Ugly code, but significantly speeds up the process if a category is set
+            if not article["category"] == category:
+                if i % twpc_helper.batch_size == 0 or i == end:
+                    if len(articles) > 0:
+                        save_as_csv(articles)
+                        articles = []
+                    print(f"Progress: {i} / {end}.")
+                continue
             article["text"] = stringify_contents(article)
             article["date"], article["time"] = unix_to_dt(article)
             article["image_url"], article["image_caption"] = get_image_url_and_caption(article)
             article["author_bio"] = get_author_bio(article)
-            article["category"], article["subcategory"] = get_categories(article)
             if article["title"] is None or article["title"] == "":
                 article["title"] = "NaN"
             if article["author"] == "":
@@ -57,15 +66,16 @@ def get_categories(article):
         if content["type"] == "kicker" \
                 and "content" in content and content["content"] is not None:
             return categories.get_group(content["content"]), content["content"]
-    return "NaN", "NaN"
+    return np.nan, np.nan
 
 
 # Gets author bio from content array
 def get_author_bio(article):
+    author_bios = []
     for content in article["contents"]:
         if "bio" in content and content["bio"] != "":
-            return twpc_helper.parser(content["bio"])
-    return "NaN"
+            author_bios.append(twpc_helper.parser(content["bio"]))
+    return "".join(author_bios) if not len(author_bios) == 0 else np.nan
 
 
 def is_compilation(article):
@@ -83,7 +93,7 @@ def get_author_if_compilation(article):
         clean_text = str(re.sub(clean, "", compilation)).split()
         i = rindex(clean_text, "by")
         return " ".join(clean_text[i + 1:]), "compilation"
-    return "NaN", "standalone"
+    return np.nan, "standalone"
 
 
 # Assumes that the first content-blob found with a fullcaption and image URL is the "main" image of the article/blog
@@ -92,7 +102,7 @@ def get_image_url_and_caption(article):
         if content["type"] == "image":
             if "fullcaption" in content and content["fullcaption"] != "" and content["imageURL"] != "":
                 return content["imageURL"], twpc_helper.parser(content["fullcaption"])
-    return "NaN", "NaN"
+    return np.nan, np.nan
 
 
 # Convert unix dates to datetime string
@@ -105,10 +115,10 @@ def unix_to_dt(article):
         return article["date"], article["time"]
     except TypeError:
         print(f"Unable to convert {article['published_date']}, for id: {article['id']}")
-        return "NaN", "NaN"
+        return np.nan, np.nan
     except OSError:
         print(f"Invalid argument: {article['published_date']}, for id: {article['id']}")
-        return "NaN", "NaN"
+        return np.nan, np.nan
 
 
 # Finds relevant content in the contents-array found in articles
@@ -134,7 +144,7 @@ def stringify_contents(article):
     content_array = list(filter(None, content_array))  # Remove empty strings
     final_string = " ".join(content_array).replace("\n", "")
     if final_string == "":
-        final_string = "NaN"
+        final_string = np.nan
     return final_string
 
 
@@ -164,8 +174,8 @@ if __name__ == '__main__':
     filterwarnings("ignore", category=UserWarning, module="bs4")  # Suppress userwarnings
     twpc_helper = TWPCHelper(
         source_path="E:/data/corpus/TWPC.jl",
-        save_path="E:/data/twp_corpus.csv",
-        batch_size=20000,
-        mode="plain"
+        save_path="E:/data/Final/twp_corpus_politics.csv",
+        batch_size=50000,
+        mode="html"
     )
     main()
