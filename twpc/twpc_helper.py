@@ -7,12 +7,13 @@ from bs4 import BeautifulSoup
 
 
 class TWPCHelper:
-    def __init__(self, source_path, save_path, mode=None, batch_size=None, properties_to_discard=None):
+    def __init__(self, source_path, save_path, category=None, mode=None, batch_size=None, properties_to_discard=None):
         self.mode = mode if mode in ("html", "plain") else "plain"
         self.batch_size = 10000 if batch_size is None else batch_size
         self.properties_to_discard = ("source", "published_date") if properties_to_discard is None \
             else properties_to_discard
         self.source_path = source_path
+        self.category = category
         self.save_path = save_path + "_" + self.mode + ".csv" if not save_path.endswith(".csv") else save_path
         self.parser = self.get_parser()
         self.print()

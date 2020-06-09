@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
     A script to clean and improve the TREC Washington Post Corpus for use in research. Creates a CSV file.
+    The 2017 version of the dataset was used when this script was made.
 """
 import os
 import re
@@ -18,7 +19,7 @@ from twpc_helper import TWPCHelper
 from utils import options, file_len, rindex
 
 
-def main(category=None):
+def main():
     if os.path.exists(twpc_helper.save_path):
         twpc_helper.save_path = options(twpc_helper.save_path)
         print(f"New path: {twpc_helper.save_path}")
@@ -29,7 +30,7 @@ def main(category=None):
             article["contents"] = list(filter(None, article["contents"]))
             article["category"], article["subcategory"] = get_categories(article)
             # Ugly code, but significantly speeds up the process if a category is set
-            if not article["category"] == category:
+            if twpc_helper.category is not None and not article["category"] == twpc_helper.category:
                 if i % twpc_helper.batch_size == 0 or i == end:
                     if len(articles) > 0:
                         save_as_csv(articles)
@@ -41,7 +42,7 @@ def main(category=None):
             article["image_url"], article["image_caption"] = get_image_url_and_caption(article)
             article["author_bio"] = get_author_bio(article)
             if article["title"] is None or article["title"] == "":
-                article["title"] = "NaN"
+                article["title"] = np.nan
             if article["author"] == "":
                 article["author"], article['subtype'] = get_author_if_compilation(article)
             else:

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
     A category mapping module
+    Some sections/subcategories of The Washington Post cannot be appropriately mapped. These are typically
+    opinion-based, or loosely-formatted blogs, or similar. These are mostly mapped as a standalone category.
 """
 
 categories = {
@@ -22,7 +24,6 @@ categories = {
         "Federal Insider",
         "2chambers",
         "The Fed Page",
-        "Community Relations",
         "World Politics",
         "Wonkblog",
         "Post Politics",
@@ -91,7 +92,6 @@ categories = {
         "Virginia",
         "Crime & Public Safety",
         "Public Safety",
-        "Education",
         "Going Out Guide",
         "Restaurants & Bars",
         "Transportations",
@@ -177,7 +177,6 @@ categories = {
         "Fiscal Cliff",
         "Keystone Highway",
         "World Business",
-        "Wonkblog",
     ],
     "Personal Finance": [
         "Personal Finance",
@@ -340,7 +339,8 @@ categories = {
     ],
     "PR": [
         "WashPost PR Blog",
-        "PR"
+        "PR",
+        "Community Relations"
     ],
     "America Answers": [
         "America Answers",

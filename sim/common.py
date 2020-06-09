@@ -190,13 +190,16 @@ def textblob_scores(sp, df, feature, score_type: tuple):
     """
         :param score_type must be a tuple of either "0, sentiment", or "1, subjectivity"
     """
-    if not score_type == (0, "sentiment") and not score_type == (1, "subjectivity"):
+    if not score_type == (0, "sentiment") or not score_type == (1, "subjectivity"):
         raise ValueError(f"arg {score_type} must be a tuple of either '0, sentiment', or '1, subjectivity'")
     print(f"Extracting {score_type[1]} on {feature}")
     text = df[feature]
+    text = stemming_and_stopwords(text)
 
     def compute_normalize(s):
-        return (TextBlob(s).sentiment[score_type[0]] + 1) / 2
+        y = (TextBlob(s).sentiment[score_type[0]] + 1) / 2
+        print()
+        return y
 
     def compute(s):
         return TextBlob(s).sentiment[score_type[0]]

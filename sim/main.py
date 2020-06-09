@@ -42,8 +42,6 @@ def run():
 
     image_features_exists()
 
-    # data = utils.get_df(SESSION + "data_new_plain.csv", dt=True)
-
     similarity_functions.run(SESSION, data)
 
     metric_combiner.run(SESSION,

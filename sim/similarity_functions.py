@@ -8,7 +8,7 @@ from wrappers import bio_similarity, text_similarity, title_similarity, \
     image_similarity, time_similarity, category_similarity, author_similarity
 
 TITLE = "title"
-TEXT = "text"
+BODY_TEXT = "text"
 AUTHOR_BIO = "author_bio"
 AUTHOR = "author"
 IMAGE = "image"
@@ -36,18 +36,18 @@ def compute(df, update):
             title_similarity.title_ngram(SIM_SESSION + "title-ngram.csv", df, n=2)
         if "lda" in metrics[TITLE]:
             title_similarity.title_lda(SIM_SESSION + "title-lda.csv", df, SIM_SESSION, update)
-    if TEXT in metrics:
-        if "tfidf" in metrics[TEXT]:
+    if BODY_TEXT in metrics:
+        if "tfidf" in metrics[BODY_TEXT]:
             text_similarity.text_tfidf_cosine_sim(SIM_SESSION + "text-tfidf-cs.csv", df)
-        if "tfidf_constr" in metrics[TEXT]:
+        if "tfidf_constr" in metrics[BODY_TEXT]:
             text_similarity.text_tfidf_cosine_sim_length_constrained(SIM_SESSION + "text-tfidf-cs-constr.csv", df, 50)
-        if "subjectivity" in metrics[TEXT]:
+        if "subjectivity" in metrics[BODY_TEXT]:
             text_similarity.text_textblob(SIM_SESSION + "text-subjectivity.csv",
                                           SIM_SESSION + "text-subjectivity-sim.csv", df, (1, "subjectivity"), update)
-        if "sentiment" in metrics[TEXT]:
+        if "sentiment" in metrics[BODY_TEXT]:
             text_similarity.text_textblob(SIM_SESSION + "text-sentiment.csv",
                                           SIM_SESSION + "text-sentiment-sim.csv", df, (0, "sentiment"), update)
-        if "lda" in metrics[TEXT]:
+        if "lda" in metrics[BODY_TEXT]:
             text_similarity.text_lda(SIM_SESSION + "text-lda.csv", df, SIM_SESSION, update)
     if IMAGE in metrics:
         if "emb" in metrics[IMAGE]:
@@ -90,7 +90,7 @@ def run(session_name, data):
     SIM_SESSION = session_name
     metrics = {
         TITLE: ["lev", "jw", "lcs", "ngram", "lda"],
-        TEXT: ["tfidf", "tfidf_constr", "sentiment", "lda"],
+        BODY_TEXT: ["tfidf", "tfidf_constr", "sentiment", "lda"],
         IMAGE: ["entropy", "sharpness", "brightness", "colorfulness", "contrast"],
         AUTHOR_BIO: ["tfidf", "lda"],
         AUTHOR: ["jaccard"],

@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+NOT USED FOR THE STUDY
+"""
 
 import glob
 
