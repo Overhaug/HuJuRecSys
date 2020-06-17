@@ -6,8 +6,8 @@
 * Various methods for computing similarity on a number of article properties. Can be viewed in (sim -> similarity_functions.py)
 * Various methods for creating graphs of the resulting dataset/sample, e.g. graphs of date of publication distributions
 * Methods for sampling using a multi-stage approach, where
- - Articles containing NaN's are identified and ignored, including images containing placeholder or corrupted images
- - For reformatting similarity scores to column-style, thus being quantile-sampling capable
+ * Articles containing NaN's are identified and ignored, including images containing placeholder or corrupted images
+ * For reformatting similarity scores to column-style, thus being quantile-sampling capable
 - Various methods for processing images, i.e. checking for corrupted images using multiprocessing. Takes about 10 minutes with 650K images on an SSD.
 
 And many more, small methods to help exploring the dataset.
