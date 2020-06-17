@@ -1,5 +1,6 @@
 ## Developing and Comparing Similarity Functions for the News Recommender Domain Using Human Judgements
-### Contents
+### Master's Thesis
+#### Contents
 * Scripts for processing the 2017-version of the Wasington Post Corpus, provided by TREC (https://trec.nist.gov/data/wapost/)
 * Scripts for downloading embedded images
 * Various methods for computing similarity on a number of article properties. Can be viewed in (sim -> similarity_functions.py)
